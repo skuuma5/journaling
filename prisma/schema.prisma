@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL") // Vercel كيعطيك هاد المتغير تلقائياً
+  directUrl = env("POSTGRES_URL_NON_POOLING") // خاص بـ Migrations
 }
 
 model User {
@@ -27,8 +28,8 @@ model Account {
   profitTarget   Float?
   maxDrawdown    Float?
   dailyLossLimit Float?
-  accountType    String?           @default("LIVE") // EVALUATION, FUNDED, LIVE, DEMO
-  status         String            @default("HEALTHY") // HEALTHY, WARNING, NEAR_BREACH, BREACHED, TARGET_REACHED
+  accountType    String?           @default("LIVE")
+  status         String            @default("HEALTHY")
   isArchived     Boolean           @default(false)
   userId         String
   user           User              @relation(fields: [userId], references: [id])
@@ -42,23 +43,23 @@ model Trade {
   id              String       @id @default(cuid())
   date            DateTime     @default(now())
   symbol          String
-  direction       String // BUY, SELL
+  direction       String
   entryPrice      Float
   exitPrice       Float?
   stopLoss        Float?
   takeProfit      Float?
   lotSize         Float
-  riskAmount      Float? // Risk in $
-  riskPercent     Float? // Risk in %
-  rewardToRisk    Float? // Planned R:R
-  actualR         Float? // Realized R:R
-  pnl             Float? // P&L in $
-  pnlPercentage   Float? // P&L in %
-  result          String? // WIN, LOSS, BREAKEVEN
-  status          String       @default("CLOSED") // OPEN, CLOSED
+  riskAmount      Float?
+  riskPercent     Float?
+  rewardToRisk    Float?
+  actualR         Float?
+  pnl             Float?
+  pnlPercentage   Float?
+  result          String?
+  status          String       @default("CLOSED")
   strategyId      String?
   strategy        Strategy?    @relation(fields: [strategyId], references: [id])
-  session         String? // ASIA, LONDON, NY
+  session         String?
   timeframe       String?
   marketCondition String?
   notes           String?
@@ -77,7 +78,7 @@ model Trade {
 model TradeImage {
   id        String   @id @default(cuid())
   url       String
-  type      String? // BEFORE, DURING, AFTER
+  type      String?
   tradeId   String
   trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
