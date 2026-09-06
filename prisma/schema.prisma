@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id             String         @id @default(cuid())
+  email          String         @unique
+  name           String?
+  accounts       Account[]
+  journalEntries JournalEntry[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Account {
+  id             String            @id @default(cuid())
+  name           String
+  description    String?
+  currency       String            @default("USD")
+  initialBalance Float
+  currentBalance Float
+  profitTarget   Float?
+  maxDrawdown    Float?
+  dailyLossLimit Float?
+  accountType    String?           @default("LIVE") // EVALUATION, FUNDED, LIVE, DEMO
+  status         String            @default("HEALTHY") // HEALTHY, WARNING, NEAR_BREACH, BREACHED, TARGET_REACHED
+  isArchived     Boolean           @default(false)
+  userId         String
+  user           User              @relation(fields: [userId], references: [id])
+  trades         Trade[]
+  snapshots      AccountSnapshot[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model Trade {
+  id              String       @id @default(cuid())
+  date            DateTime     @default(now())
+  symbol          String
+  direction       String // BUY, SELL
+  entryPrice      Float
+  exitPrice       Float?
+  stopLoss        Float?
+  takeProfit      Float?
+  lotSize         Float
+  riskAmount      Float? // Risk in $
+  riskPercent     Float? // Risk in %
+  rewardToRisk    Float? // Planned R:R
+  actualR         Float? // Realized R:R
+  pnl             Float? // P&L in $
+  pnlPercentage   Float? // P&L in %
+  result          String? // WIN, LOSS, BREAKEVEN
+  status          String       @default("CLOSED") // OPEN, CLOSED
+  strategyId      String?
+  strategy        Strategy?    @relation(fields: [strategyId], references: [id])
+  session         String? // ASIA, LONDON, NY
+  timeframe       String?
+  marketCondition String?
+  notes           String?
+  preTradePlan    String?
+  postTradeReview String?
+  emotion         String?
+  accountId       String
+  account         Account      @relation(fields: [accountId], references: [id])
+  images          TradeImage[]
+  tags            TradeTag[]
+  mistakes        Mistake[]    @relation("TradeMistakes")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model TradeImage {
+  id        String   @id @default(cuid())
+  url       String
+  type      String? // BEFORE, DURING, AFTER
+  tradeId   String
+  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Strategy {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  trades      Trade[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Tag {
+  id     String     @id @default(cuid())
+  name   String     @unique
+  trades TradeTag[]
+}
+
+model TradeTag {
+  tradeId String
+  tagId   String
+  trade   Trade  @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([tradeId, tagId])
+}
+
+model Mistake {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  trades      Trade[]  @relation("TradeMistakes")
+}
+
+model AccountSnapshot {
+  id        String   @id @default(cuid())
+  balance   Float
+  pnl       Float
+  date      DateTime @default(now())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model JournalEntry {
+  id            String   @id @default(cuid())
+  date          DateTime @default(now())
+  marketBias    String?
+  importantNews String?
+  plan          String?
+  levels        String?
+  scenarios     String?
+  lessons       String?
+  mistakes      String?
+  tomorrowPlan  String?
+  mood          String?
+  rating        Int?
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, date])
+}
