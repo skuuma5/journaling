@@ -3,9 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("POSTGRES_PRISMA_URL") // Vercel كيعطيك هاد المتغير تلقائياً
-  directUrl = env("POSTGRES_URL_NON_POOLING") // خاص بـ Migrations
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // هاد المتغير كيعطيه Neon أو Vercel
+  directUrl = env("DIRECT_URL")   // هاد المتغير ضروري للـ Migrations
 }
 
 model User {

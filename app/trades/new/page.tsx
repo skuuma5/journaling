@@ -31,7 +31,7 @@ export default function NewTradePage() {
     preTradePlan: "",
     postTradeReview: "",
     emotion: "Calm",
-    result: "WIN",
+    result: "WIN", // القيمة الافتراضية
   })
 
   const [selectedMistakes, setSelectedMistakes] = useState<string[]>([])
@@ -87,7 +87,8 @@ export default function NewTradePage() {
           actualR: formData.actualR ? parseFloat(formData.actualR) : null,
           mistakes: selectedMistakes,
           tags: tags,
-          imageUrl: imagePreview
+          imageUrl: imagePreview,
+          result: formData.result // إرسال النتيجة التي اخترتها يدوياً
         }),
       })
 
@@ -104,15 +105,16 @@ export default function NewTradePage() {
     }
   }
 
-  // تحديد اللون بناءً على النتيجة أو القيمة
-  const isNegative = parseFloat(formData.pnl) < 0 || formData.result === "LOSS"
-  const isPositive = parseFloat(formData.pnl) > 0 || formData.result === "WIN"
+  // منطق الألوان الديناميكي
+  const pnlValue = parseFloat(formData.pnl)
+  const isNegative = pnlValue < 0 || formData.result === "LOSS"
+  const isPositive = pnlValue > 0 || formData.result === "WIN"
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Link href="/trades" className="p-2 hover:bg-secondary rounded-full transition-colors">
+          <Link href="/trades" className="p-2 hover:bg-secondary rounded-full transition-colors text-white">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
@@ -125,21 +127,20 @@ export default function NewTradePage() {
           disabled={loading}
           className="flex items-center gap-2 bg-white text-black px-6 py-2.5 rounded-md text-xs font-black uppercase tracking-widest hover:bg-neutral-200 transition-all active:scale-95 disabled:opacity-50"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : <Save className="w-4 h-4" />}
           Commit Trade
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          {/* Core Trade Data */}
           <div className="bg-card border border-border rounded-xl p-6 space-y-6 shadow-2xl">
             <h3 className="font-black text-xs uppercase tracking-[0.3em] border-b border-border pb-4 text-neutral-400">Trade Execution</h3>
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Account</label>
-                <select name="accountId" value={formData.accountId} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-white/20 uppercase font-bold text-white">
+                <select name="accountId" value={formData.accountId} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-white/20 uppercase font-bold text-white cursor-pointer">
                   {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                 </select>
               </div>
@@ -152,22 +153,22 @@ export default function NewTradePage() {
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Direction</label>
                 <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, direction: "BUY" }))} className={cn("py-2 text-[10px] font-black rounded border transition-all uppercase tracking-widest", formData.direction === "BUY" ? "bg-success/20 border-success text-success" : "bg-neutral-900 border-border text-muted-foreground")}>BUY</button>
-                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, direction: "SELL" }))} className={cn("py-2 text-[10px] font-black rounded border transition-all uppercase tracking-widest", formData.direction === "SELL" ? "bg-danger/20 border-danger text-danger" : "bg-neutral-900 border-border text-muted-foreground")}>SELL</button>
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, direction: "BUY" }))} className={cn("py-2 text-[10px] font-black rounded border transition-all uppercase tracking-widest", formData.direction === "BUY" ? "bg-success/20 border-success text-success" : "bg-neutral-900 border-border text-neutral-500")}>BUY</button>
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, direction: "SELL" }))} className={cn("py-2 text-[10px] font-black rounded border transition-all uppercase tracking-widest", formData.direction === "SELL" ? "bg-danger/20 border-danger text-danger" : "bg-neutral-900 border-border text-neutral-500")}>SELL</button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Trade Result</label>
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Manual Result</label>
                 <div className="grid grid-cols-3 gap-1">
-                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, result: "WIN" }))} className={cn("py-2 text-[9px] font-black rounded border transition-all uppercase", formData.result === "WIN" ? "bg-success border-success text-white" : "bg-neutral-900 border-border text-neutral-500")}>WIN</button>
-                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, result: "LOSS" }))} className={cn("py-2 text-[9px] font-black rounded border transition-all uppercase", formData.result === "LOSS" ? "bg-danger border-danger text-white" : "bg-neutral-900 border-border text-neutral-500")}>LOSS</button>
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, result: "WIN" }))} className={cn("py-2 text-[9px] font-black rounded border transition-all uppercase", formData.result === "WIN" ? "bg-success border-success text-white shadow-[0_0_10px_rgba(16,185,129,0.2)]" : "bg-neutral-900 border-border text-neutral-500")}>WIN</button>
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, result: "LOSS" }))} className={cn("py-2 text-[9px] font-black rounded border transition-all uppercase", formData.result === "LOSS" ? "bg-danger border-danger text-white shadow-[0_0_10px_rgba(239,68,68,0.2)]" : "bg-neutral-900 border-border text-neutral-500")}>LOSS</button>
                   <button type="button" onClick={() => setFormData(prev => ({ ...prev, result: "BREAKEVEN" }))} className={cn("py-2 text-[9px] font-black rounded border transition-all uppercase", formData.result === "BREAKEVEN" ? "bg-neutral-700 border-neutral-600 text-white" : "bg-neutral-900 border-border text-neutral-500")}>BE</button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", isNegative ? "text-danger" : isPositive ? "text-success" : "text-muted-foreground")}>Manual P&L ($)</label>
+                <label className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", isNegative ? "text-danger" : isPositive ? "text-success" : "text-muted-foreground")}>Net P&L ($)</label>
                 <input
                   type="number"
                   step="any"
@@ -176,9 +177,9 @@ export default function NewTradePage() {
                   onChange={handleChange}
                   placeholder="0.00"
                   className={cn(
-                    "w-full bg-neutral-900 border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 transition-all font-black",
-                    isNegative ? "border-danger/50 text-danger focus:ring-danger" :
-                    isPositive ? "border-success/50 text-success focus:ring-success" :
+                    "w-full bg-neutral-900 border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 transition-all font-black tabular-nums",
+                    isNegative ? "border-danger text-danger focus:ring-danger shadow-[0_0_10px_rgba(239,68,68,0.1)]" :
+                    isPositive ? "border-success text-success focus:ring-success shadow-[0_0_10px_rgba(16,185,129,0.1)]" :
                     "border-border text-white focus:ring-white/20"
                   )}
                 />
@@ -186,7 +187,7 @@ export default function NewTradePage() {
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-blue-400">Realized R:R</label>
-                <input type="number" step="any" name="actualR" value={formData.actualR} onChange={handleChange} placeholder="e.g. 2.5" className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-400 text-blue-400 font-black" />
+                <input type="number" step="any" name="actualR" value={formData.actualR} onChange={handleChange} placeholder="e.g. 2.5" className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-blue-400 font-black tabular-nums" />
               </div>
 
               <div className="space-y-2">
@@ -227,22 +228,28 @@ export default function NewTradePage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Strategy</label>
-                <select name="strategyId" value={formData.strategyId} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none font-bold text-white uppercase">
+                <select name="strategyId" value={formData.strategyId} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none font-bold text-white uppercase cursor-pointer">
                   <option value="">No Strategy Selected</option>
                   {strategies.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Session</label>
-                <select name="session" value={formData.session} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none font-bold text-white uppercase">
+                <select name="session" value={formData.session} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none font-bold text-white uppercase cursor-pointer">
                   <option value="ASIA">ASIA</option>
                   <option value="LONDON">LONDON</option>
                   <option value="NY">NY</option>
                 </select>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Date</label>
-                <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-white/20 text-white font-bold" />
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                   <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Date</label>
+                   <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-xs font-bold text-white" />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Time</label>
+                   <input type="time" name="time" value={formData.time} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-xs font-bold text-white" />
+                </div>
               </div>
             </div>
           </div>
