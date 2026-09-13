@@ -3,7 +3,6 @@ import { formatCurrency, cn } from "@/lib/utils"
 import {
   ArrowLeft,
   TrendingUp,
-  Target,
   Activity,
   BarChart2,
   History,
@@ -33,18 +32,18 @@ async function getAccountData(id: string) {
   if (!account) return null
 
   const allTrades = account.trades
-  const wins = allTrades.filter(t => t.result === 'WIN').length
+  const wins = allTrades.filter((t: any) => t.result === 'WIN').length
   const winRate = allTrades.length > 0 ? (wins / allTrades.length) * 100 : 0
 
-  const winners = allTrades.filter(t => (t.pnl || 0) > 0)
-  const losers = allTrades.filter(t => (t.pnl || 0) < 0)
+  const winners = allTrades.filter((t: any) => (t.pnl || 0) > 0)
+  const losers = allTrades.filter((t: any) => (t.pnl || 0) < 0)
 
-  const avgWin = winners.length > 0 ? winners.reduce((sum, t) => sum + (t.pnl || 0), 0) / winners.length : 0
-  const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((sum, t) => sum + (t.pnl || 0), 0) / losers.length) : 0
+  const avgWin = winners.length > 0 ? winners.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0) / winners.length : 0
+  const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0) / losers.length) : 0
   const profitFactor = avgLoss > 0 ? avgWin / avgLoss : 0
 
-  const bestTrade = winners.length > 0 ? Math.max(...winners.map(t => t.pnl || 0)) : 0
-  const worstTrade = losers.length > 0 ? Math.min(...losers.map(t => t.pnl || 0)) : 0
+  const bestTrade = winners.length > 0 ? Math.max(...winners.map((t: any) => t.pnl || 0)) : 0
+  const worstTrade = losers.length > 0 ? Math.min(...losers.map((t: any) => t.pnl || 0)) : 0
 
   const pnl = account.currentBalance - account.initialBalance
   const pnlPercent = (pnl / account.initialBalance) * 100
@@ -57,7 +56,7 @@ async function getAccountData(id: string) {
       winRate,
       profitFactor,
       totalTrades: allTrades.length,
-      avgR: allTrades.length > 0 ? allTrades.reduce((sum, t) => sum + (t.actualR || 0), 0) / allTrades.length : 0,
+      avgR: allTrades.length > 0 ? allTrades.reduce((sum: number, t: any) => sum + (t.actualR || 0), 0) / allTrades.length : 0,
       bestTrade,
       worstTrade,
       avgWin,
@@ -151,7 +150,7 @@ export default async function AccountDetailPage({ params }: { params: { id: stri
                       <td colSpan={5} className="px-6 py-10 text-center text-xs text-muted-foreground italic uppercase tracking-widest opacity-50">No terminal executions recorded</td>
                     </tr>
                   ) : (
-                    account.trades.slice(0, 10).map((trade) => (
+                    account.trades.slice(0, 10).map((trade: any) => (
                       <tr key={trade.id} className="hover:bg-neutral-900/30 transition-all group">
                         <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-neutral-500 group-hover:text-neutral-300">
                           {format(new Date(trade.date), 'MMM d, HH:mm')}
