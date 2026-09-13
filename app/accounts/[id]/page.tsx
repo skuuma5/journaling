@@ -13,6 +13,17 @@ import { notFound } from "next/navigation"
 import { StatCard } from "@/components/StatCard"
 import { format } from "date-fns"
 
+// Define types to strictly satisfy TypeScript
+type TradeItem = {
+  id: string
+  date: Date | string
+  symbol: string
+  direction: string
+  result: string
+  pnl: number | null
+  actualR: number | null
+}
+
 async function getAccountData(id: string) {
   const account = await prisma.account.findUnique({
     where: { id },
@@ -31,19 +42,19 @@ async function getAccountData(id: string) {
 
   if (!account) return null
 
-  const allTrades = account.trades
-  const wins = allTrades.filter((t: any) => t.result === 'WIN').length
+  const allTrades: TradeItem[] = account.trades
+  const wins = allTrades.filter((t) => t.result === 'WIN').length
   const winRate = allTrades.length > 0 ? (wins / allTrades.length) * 100 : 0
 
-  const winners = allTrades.filter((t: any) => (t.pnl || 0) > 0)
-  const losers = allTrades.filter((t: any) => (t.pnl || 0) < 0)
+  const winners = allTrades.filter((t) => (t.pnl || 0) > 0)
+  const losers = allTrades.filter((t) => (t.pnl || 0) < 0)
 
-  const avgWin = winners.length > 0 ? winners.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0) / winners.length : 0
-  const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0) / losers.length) : 0
+  const avgWin = winners.length > 0 ? winners.reduce((sum, t) => sum + (t.pnl || 0), 0) / winners.length : 0
+  const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((sum, t) => sum + (t.pnl || 0), 0) / losers.length) : 0
   const profitFactor = avgLoss > 0 ? avgWin / avgLoss : 0
 
-  const bestTrade = winners.length > 0 ? Math.max(...winners.map((t: any) => t.pnl || 0)) : 0
-  const worstTrade = losers.length > 0 ? Math.min(...losers.map((t: any) => t.pnl || 0)) : 0
+  const bestTrade = winners.length > 0 ? Math.max(...winners.map((t) => t.pnl || 0)) : 0
+  const worstTrade = losers.length > 0 ? Math.min(...losers.map((t) => t.pnl || 0)) : 0
 
   const pnl = account.currentBalance - account.initialBalance
   const pnlPercent = (pnl / account.initialBalance) * 100
@@ -56,7 +67,7 @@ async function getAccountData(id: string) {
       winRate,
       profitFactor,
       totalTrades: allTrades.length,
-      avgR: allTrades.length > 0 ? allTrades.reduce((sum: number, t: any) => sum + (t.actualR || 0), 0) / allTrades.length : 0,
+      avgR: allTrades.length > 0 ? allTrades.reduce((sum, t) => sum + (t.actualR || 0), 0) / allTrades.length : 0,
       bestTrade,
       worstTrade,
       avgWin,
@@ -150,7 +161,7 @@ export default async function AccountDetailPage({ params }: { params: { id: stri
                       <td colSpan={5} className="px-6 py-10 text-center text-xs text-muted-foreground italic uppercase tracking-widest opacity-50">No terminal executions recorded</td>
                     </tr>
                   ) : (
-                    account.trades.slice(0, 10).map((trade: any) => (
+                    account.trades.slice(0, 10).map((trade: TradeItem) => (
                       <tr key={trade.id} className="hover:bg-neutral-900/30 transition-all group">
                         <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-neutral-500 group-hover:text-neutral-300">
                           {format(new Date(trade.date), 'MMM d, HH:mm')}
@@ -167,8 +178,8 @@ export default async function AccountDetailPage({ params }: { params: { id: stri
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right font-black text-sm tracking-tighter">
-                          <span className={trade.pnl! >= 0 ? "text-success" : "text-danger"}>
-                            {trade.pnl! >= 0 ? "+" : ""}{formatCurrency(trade.pnl!, account.currency)}
+                          <span className={(trade.pnl || 0) >= 0 ? "text-success" : "text-danger"}>
+                            {(trade.pnl || 0) >= 0 ? "+" : ""}{formatCurrency(trade.pnl || 0, account.currency)}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
