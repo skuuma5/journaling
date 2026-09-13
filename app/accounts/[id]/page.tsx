@@ -13,15 +13,15 @@ import { notFound } from "next/navigation"
 import { StatCard } from "@/components/StatCard"
 import { format } from "date-fns"
 
-// Define types to strictly satisfy TypeScript
-type TradeItem = {
-  id: string
-  date: Date | string
-  symbol: string
-  direction: string
-  result: string
-  pnl: number | null
-  actualR: number | null
+// تعريف النوع الصريح للصفقة لضمان توافقه مع TypeScript
+interface TradeItem {
+  id: string;
+  date: Date;
+  symbol: string;
+  direction: string;
+  result: string | null;
+  pnl: number | null;
+  actualR: number | null;
 }
 
 async function getAccountData(id: string) {
@@ -42,19 +42,27 @@ async function getAccountData(id: string) {
 
   if (!account) return null
 
-  const allTrades: TradeItem[] = account.trades
-  const wins = allTrades.filter((t) => t.result === 'WIN').length
+  // تحديد نوع المصفوفة بشكل صريح لتجنب implicit any
+  const allTrades = (account.trades || []) as TradeItem[];
+
+  const wins = allTrades.filter((t: TradeItem) => t.result === 'WIN').length
   const winRate = allTrades.length > 0 ? (wins / allTrades.length) * 100 : 0
 
-  const winners = allTrades.filter((t) => (t.pnl || 0) > 0)
-  const losers = allTrades.filter((t) => (t.pnl || 0) < 0)
+  const winners = allTrades.filter((t: TradeItem) => (t.pnl || 0) > 0)
+  const losers = allTrades.filter((t: TradeItem) => (t.pnl || 0) < 0)
 
-  const avgWin = winners.length > 0 ? winners.reduce((sum, t) => sum + (t.pnl || 0), 0) / winners.length : 0
-  const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((sum, t) => sum + (t.pnl || 0), 0) / losers.length) : 0
+  const avgWin = winners.length > 0
+    ? winners.reduce((sum: number, t: TradeItem) => sum + (t.pnl || 0), 0) / winners.length
+    : 0
+
+  const avgLoss = losers.length > 0
+    ? Math.abs(losers.reduce((sum: number, t: TradeItem) => sum + (t.pnl || 0), 0) / losers.length)
+    : 0
+
   const profitFactor = avgLoss > 0 ? avgWin / avgLoss : 0
 
-  const bestTrade = winners.length > 0 ? Math.max(...winners.map((t) => t.pnl || 0)) : 0
-  const worstTrade = losers.length > 0 ? Math.min(...losers.map((t) => t.pnl || 0)) : 0
+  const bestTrade = winners.length > 0 ? Math.max(...winners.map((t: TradeItem) => t.pnl || 0)) : 0
+  const worstTrade = losers.length > 0 ? Math.min(...losers.map((t: TradeItem) => t.pnl || 0)) : 0
 
   const pnl = account.currentBalance - account.initialBalance
   const pnlPercent = (pnl / account.initialBalance) * 100
@@ -67,7 +75,9 @@ async function getAccountData(id: string) {
       winRate,
       profitFactor,
       totalTrades: allTrades.length,
-      avgR: allTrades.length > 0 ? allTrades.reduce((sum, t) => sum + (t.actualR || 0), 0) / allTrades.length : 0,
+      avgR: allTrades.length > 0
+        ? allTrades.reduce((sum: number, t: TradeItem) => sum + (t.actualR || 0), 0) / allTrades.length
+        : 0,
       bestTrade,
       worstTrade,
       avgWin,
@@ -161,7 +171,7 @@ export default async function AccountDetailPage({ params }: { params: { id: stri
                       <td colSpan={5} className="px-6 py-10 text-center text-xs text-muted-foreground italic uppercase tracking-widest opacity-50">No terminal executions recorded</td>
                     </tr>
                   ) : (
-                    account.trades.slice(0, 10).map((trade: TradeItem) => (
+                    account.trades.slice(0, 10).map((trade: any) => (
                       <tr key={trade.id} className="hover:bg-neutral-900/30 transition-all group">
                         <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-neutral-500 group-hover:text-neutral-300">
                           {format(new Date(trade.date), 'MMM d, HH:mm')}
@@ -231,31 +241,6 @@ export default async function AccountDetailPage({ params }: { params: { id: stri
                   <div className="w-full bg-neutral-900 h-1.5 rounded-full overflow-hidden border border-border/50">
                      <div className="h-full bg-danger transition-all duration-1000" style={{ width: `${Math.min(100, Math.max(0, (Math.abs(Math.min(0, stats.pnl)) / (account.maxDrawdown || 1000)) * 100))}%` }} />
                   </div>
-               </div>
-            </div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-6 space-y-6 shadow-2xl">
-            <h3 className="font-black text-xs uppercase tracking-[0.3em] flex items-center gap-2 text-neutral-400">
-              <Activity className="w-4 h-4" />
-              Terminal Audit
-            </h3>
-            <div className="space-y-4">
-               <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-widest">
-                  <span className="text-muted-foreground">Peak Return</span>
-                  <span className="text-success tabular-nums">{stats.bestTrade !== 0 ? `+${formatCurrency(stats.bestTrade, account.currency)}` : "—"}</span>
-               </div>
-               <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-widest">
-                  <span className="text-muted-foreground">Max Draw</span>
-                  <span className="text-danger tabular-nums">{stats.worstTrade !== 0 ? formatCurrency(stats.worstTrade, account.currency) : "—"}</span>
-               </div>
-               <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-widest pt-3 border-t border-border/50">
-                  <span className="text-muted-foreground">Avg Winner</span>
-                  <span className="text-success tabular-nums">{stats.avgWin !== 0 ? `+${formatCurrency(stats.avgWin, account.currency)}` : "—"}</span>
-               </div>
-               <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-widest">
-                  <span className="text-muted-foreground">Avg Loser</span>
-                  <span className="text-danger tabular-nums">{stats.avgLoss !== 0 ? `-${formatCurrency(stats.avgLoss, account.currency)}` : "—"}</span>
                </div>
             </div>
           </div>
