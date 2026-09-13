@@ -4,8 +4,8 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  url       = env("POSTGRES_PRISMA_URL") // المتغير الرسمي المولد تلقائياً من فيرسيل
+  directUrl = env("POSTGRES_URL_NON_POOLING") // يستخدم للـ Migrations وتجنب مشاكل الـ Pooling
 }
 
 model User {
@@ -119,7 +119,7 @@ model TradeTag {
 
 model Mistake {
   id          String   @id @default(cuid())
-  name        String
+  name        String   @unique
   description String?
   userId      String
   user        User     @relation(fields: [userId], references: [id])
