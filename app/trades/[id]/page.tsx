@@ -50,18 +50,18 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
       <Loader2 className="w-8 h-8 text-white animate-spin" />
-      <p className="text-muted-foreground font-black uppercase tracking-[0.3em] text-[10px]">Accessing Terminal Data...</p>
+      <p className="text-muted-foreground font-black uppercase tracking-[0.3em] text-[10px]">Syncing Terminal Data...</p>
     </div>
   )
 
   if (!trade) return notFound()
 
-  // تحديد حالة الربح أو الخسارة بناءً على الرقم
+  // تحديد الحالة بناءً على الـ P&L الحقيقي
   const pnlValue = trade.pnl || 0
   const isWin = pnlValue > 0
   const isLoss = pnlValue < 0
 
-  // حماية مصفوفة الصور من الـ undefined
+  // حماية من الأخطاء في مصفوفة الصور
   const images = trade.images || []
   const mainImage = images.length > 0
     ? (images.find((img: any) => img.type === "AFTER") || images[0])
@@ -79,10 +79,10 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
-      {/* نافذة التكبير - Zoom Modal */}
+      {/* Zoom Modal - نافذة تكبير الصورة */}
       {isZoomed && mainImage && (
         <div
-          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out backdrop-blur-md"
+          className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center p-4 cursor-zoom-out backdrop-blur-md"
           onClick={() => setIsZoomed(false)}
         >
           <button className="absolute top-6 right-6 p-3 bg-white/10 rounded-full hover:bg-white/20 transition-all border border-white/10">
@@ -90,13 +90,13 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
           </button>
           <img
             src={mainImage.url}
-            alt="Trade Analysis Zoomed"
+            alt="Trade Screenshot Fullscreen"
             className="max-w-full max-h-full object-contain shadow-2xl rounded-lg border border-white/5"
           />
         </div>
       )}
 
-      {/* Top Navigation Bar */}
+      {/* Navigation Bar */}
       <div className="flex justify-between items-center border-b border-border pb-6">
         <div className="flex items-center gap-4">
           <Link href="/trades" className="p-2 hover:bg-neutral-900 rounded-md transition-colors text-muted-foreground hover:text-white border border-transparent hover:border-border">
@@ -122,7 +122,7 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
         <div className="flex gap-2">
           <Link href={`/trades/${trade.id}/edit`} className="flex items-center gap-2 bg-neutral-900 border border-border text-white px-4 py-2 rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-neutral-800 transition-all active:scale-95">
             <Edit2 className="w-3.5 h-3.5" />
-            Edit Trade
+            Edit
           </Link>
           <button onClick={handleDelete} className="flex items-center gap-2 bg-danger/5 border border-danger/20 text-danger px-4 py-2 rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-danger/10 transition-all active:scale-95">
             <Trash2 className="w-3.5 h-3.5" />
@@ -132,31 +132,31 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
       </div>
 
       <div className="grid grid-cols-12 gap-6">
-        {/* LEFT: Execution Details */}
+        {/* LEFT: Stats */}
         <div className="col-span-12 lg:col-span-3 space-y-6">
           <div className="bg-card border border-border rounded-xl p-6 space-y-6 shadow-2xl">
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 flex items-center gap-2">
-              <Layers className="w-3.5 h-3.5" /> Execution Details
+              <Layers className="w-3.5 h-3.5" /> Execution Data
             </h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground font-medium">Entry Price</span>
-                <span className="font-bold text-white tabular-nums">{trade.entryPrice?.toFixed(5) || "0.00000"}</span>
+                <span className="text-muted-foreground font-medium">Entry</span>
+                <span className="font-bold text-white tabular-nums">{trade.entryPrice?.toFixed(5) || "—"}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground font-medium">Exit Price</span>
-                <span className="font-bold text-white tabular-nums">{trade.exitPrice?.toFixed(5) || "-"}</span>
+                <span className="text-muted-foreground font-medium">Exit</span>
+                <span className="font-bold text-white tabular-nums">{trade.exitPrice?.toFixed(5) || "—"}</span>
               </div>
               <div className="flex justify-between items-center text-sm text-danger/70 border-t border-border pt-4">
                 <span className="font-medium">Stop Loss</span>
-                <span className="font-bold tabular-nums">{trade.stopLoss?.toFixed(5) || "-"}</span>
+                <span className="font-bold tabular-nums">{trade.stopLoss?.toFixed(5) || "—"}</span>
               </div>
               <div className="flex justify-between items-center text-sm text-success/70">
                 <span className="font-medium">Take Profit</span>
-                <span className="font-bold tabular-nums">{trade.takeProfit?.toFixed(5) || "-"}</span>
+                <span className="font-bold tabular-nums">{trade.takeProfit?.toFixed(5) || "—"}</span>
               </div>
               <div className="pt-4 border-t border-border flex justify-between items-center text-sm">
-                <span className="text-muted-foreground font-medium">Position Size</span>
+                <span className="text-muted-foreground font-medium">Size</span>
                 <span className="font-black text-white">{trade.lotSize} Lots</span>
               </div>
             </div>
@@ -164,36 +164,33 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
 
           <div className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-2xl">
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5" /> Context
+              <Clock className="w-3.5 h-3.5" /> Market Context
             </h3>
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-xs font-bold text-white uppercase">
                 <Calendar className="w-3.5 h-3.5 text-neutral-500" />
-                <span>{trade.date ? format(new Date(trade.date), 'EEEE, MMM d, yyyy') : "N/A"}</span>
+                <span>{trade.date ? format(new Date(trade.date), 'EEEE, MMM d, yyyy') : "—"}</span>
               </div>
               <div className="flex items-center gap-3 text-xs font-bold text-white uppercase tracking-widest">
                 <Clock className="w-3.5 h-3.5 text-neutral-500" />
-                <span>{trade.date ? format(new Date(trade.date), 'HH:mm') : "N/A"} • {trade.session || "N/A"} SESSION</span>
+                <span>{trade.date ? format(new Date(trade.date), 'HH:mm') : "—"} • {trade.session || "N/A"} SESSION</span>
               </div>
               <div className="flex items-center gap-3 text-xs font-bold text-white uppercase">
                 <Smile className="w-3.5 h-3.5 text-neutral-500" />
-                <span>FEELING: <span className={cn("font-black", isWin ? "text-success" : isLoss ? "text-danger" : "text-neutral-400")}>{trade.emotion?.toUpperCase() || "NEUTRAL"}</span></span>
+                <span>MOOD: <span className={cn("font-black", isWin ? "text-success" : isLoss ? "text-danger" : "text-neutral-400")}>{trade.emotion?.toUpperCase() || "NEUTRAL"}</span></span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* CENTER: Main Chart Display */}
+        {/* CENTER: Image & Plans */}
         <div className="col-span-12 lg:col-span-6 space-y-6">
           <div className={cn(
-            "bg-card border rounded-xl overflow-hidden shadow-2xl relative group transition-all duration-300 border-t-4",
+            "bg-card border rounded-xl overflow-hidden shadow-2xl relative group transition-all duration-300",
             isWin ? "border-success shadow-success/10" : isLoss ? "border-danger shadow-danger/10" : "border-border"
           )}>
             <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={() => setIsZoomed(true)}
-                className="bg-black/60 backdrop-blur-md p-2 rounded-md hover:bg-black/80 border border-white/10"
-              >
+              <button onClick={() => setIsZoomed(true)} className="bg-black/60 backdrop-blur-md p-2 rounded-md hover:bg-black/80 border border-white/10">
                 <Maximize2 className="w-5 h-5 text-white" />
               </button>
             </div>
@@ -205,18 +202,11 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
                {mainImage ? (
                  <img src={mainImage.url} alt="Execution Replay" className="w-full h-full object-contain relative z-10 transition-transform duration-700 group-hover:scale-[1.03]" />
                ) : (
-                 <>
-                   <ImageIcon className="w-16 h-16 opacity-5 mb-4" />
-                   <p className="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-600">Execution Replay Unavailable</p>
-                 </>
+                 <div className="flex flex-col items-center opacity-20">
+                   <ImageIcon className="w-16 h-16 mb-4" />
+                   <p className="text-[10px] font-black uppercase tracking-[0.3em]">No Chart Recorded</p>
+                 </div>
                )}
-            </div>
-            <div className="p-4 bg-neutral-900/40 border-t border-border flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <div className={cn("w-2 h-2 rounded-full animate-pulse", isWin ? "bg-success shadow-[0_0_8px_#10b981]" : isLoss ? "bg-danger shadow-[0_0_8px_#ef4444]" : "bg-neutral-600")} />
-                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{trade.symbol} Terminal Replay</span>
-              </div>
-              <button onClick={() => setIsZoomed(true)} className="text-[9px] font-black px-3 py-1 bg-white text-black rounded-sm uppercase tracking-widest hover:bg-neutral-200 transition-colors">Expand Visualization</button>
             </div>
           </div>
 
@@ -225,37 +215,34 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-success flex items-center gap-2">
                 <BrainCircuit className="w-3.5 h-3.5" /> Logic / Plan
               </h3>
-              <p className="text-[11px] font-medium text-neutral-300 leading-relaxed min-h-[100px] italic">
-                {trade.preTradePlan || "Zero log records for this execution model."}
+              <p className="text-[11px] font-medium text-neutral-300 leading-relaxed italic min-h-[100px]">
+                {trade.preTradePlan || "Zero log records for this execution logic."}
               </p>
             </div>
             <div className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-2xl">
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500 flex items-center gap-2">
-                <Activity className="w-3.5 h-3.5" /> Post-Execution Reality
+                <Activity className="w-3.5 h-3.5" /> Reality / Review
               </h3>
-              <p className="text-[11px] font-medium text-neutral-300 leading-relaxed min-h-[100px] italic">
+              <p className="text-[11px] font-medium text-neutral-300 leading-relaxed italic min-h-[100px]">
                 {trade.postTradeReview || "Zero log records for post-execution reality."}
               </p>
             </div>
           </div>
         </div>
 
-        {/* RIGHT: Net Realized Delta */}
+        {/* RIGHT: Net Delta */}
         <div className="col-span-12 lg:col-span-3 space-y-6">
           <div className={cn(
             "bg-card border rounded-xl overflow-hidden shadow-2xl transition-all border-t-4",
             isWin ? "border-success shadow-success/10" : isLoss ? "border-danger shadow-danger/10" : "border-border"
           )}>
              <div className={cn("p-8 text-center border-b border-border", isWin ? "bg-success/5" : isLoss ? "bg-danger/5" : "bg-neutral-900/10")}>
-                <p className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-2">Net Delta</p>
+                <p className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-2">Net Realized Delta</p>
                 <h3 className={cn("text-4xl font-black tracking-tighter mb-2 tabular-nums", isWin ? "text-success" : isLoss ? "text-danger" : "text-neutral-400")}>
                   {pnlValue >= 0 ? "+" : ""}{formatCurrency(pnlValue, trade.account?.currency || "USD")}
                 </h3>
                 <div className="flex justify-center items-center gap-3">
-                   <span className={cn(
-                     "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest",
-                     isWin ? "bg-success text-white" : isLoss ? "bg-danger text-white" : "bg-neutral-800 text-neutral-400"
-                   )}>
+                   <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest", isWin ? "bg-success text-white" : isLoss ? "bg-danger text-white" : "bg-neutral-800 text-neutral-400")}>
                      {(trade.actualR || 0).toFixed(2)}R
                    </span>
                    <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">{trade.result}</span>
@@ -268,11 +255,11 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
                     <span className="text-xs font-bold text-white tabular-nums">{trade.riskPercent?.toFixed(2) || "0.00"}%</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Capital Exposed</span>
+                    <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Capital at Risk</span>
                     <span className="text-xs font-bold text-white tabular-nums">{trade.riskAmount ? formatCurrency(trade.riskAmount, trade.account?.currency || "USD") : "—"}</span>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-border/50">
-                    <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Relative Change</span>
+                    <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Terminal Change</span>
                     <span className={cn("text-xs font-black tabular-nums", isWin ? "text-success" : isLoss ? "text-danger" : "text-neutral-400")}>
                       {pnlValue >= 0 ? "+" : ""}{trade.account?.initialBalance ? ((pnlValue / trade.account.initialBalance) * 100).toFixed(2) : "0.00"}%
                     </span>
@@ -283,19 +270,10 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
                   <div className="flex flex-wrap gap-2">
                     {trade.mistakes?.length > 0 ? trade.mistakes.map((m: any) => (
                       <span key={m.id} className="inline-flex items-center px-2 py-1 bg-danger/10 text-danger border border-danger/20 rounded text-[9px] font-black uppercase tracking-widest">{m.name}</span>
-                    )) : <div className="flex items-center gap-2 text-success/80"><Shield className="w-3.5 h-3.5" /><span className="text-[9px] font-black uppercase tracking-widest">Execution Protocol Met</span></div>}
+                    )) : <div className="flex items-center gap-2 text-success/80"><Shield className="w-3.5 h-3.5" /><span className="text-[9px] font-black uppercase tracking-widest">Process Discipline Met</span></div>}
                   </div>
                 </div>
              </div>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
-             <h3 className="font-black text-xs uppercase tracking-[0.3em] text-neutral-400 flex items-center gap-2 relative z-10">
-               <TrendingUp className="w-3.5 h-3.5" /> Performance Analytics
-             </h3>
-             <div className="text-[11px] text-neutral-300 leading-relaxed font-medium relative z-10 italic">
-               {isWin ? "Execution high efficiency. Setup verified against model parameters." : isLoss ? "Capital preservation successful. Loss contained within risk parameters." : "Breakeven exit. Market conditions shifted away from high-probability model."}
-             </div>
-             <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
           </div>
         </div>
       </div>
