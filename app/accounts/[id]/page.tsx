@@ -1,4 +1,4 @@
-@ts-nocheck
+// @ts-nocheck
 import prisma from "@/lib/prisma"
 import { formatCurrency, cn } from "@/lib/utils"
 import {
