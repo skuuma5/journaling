@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { createClient } from '@/lib/supabase-server'
 import { calculateTradeMetrics } from "@/lib/trading-calculations"
 
 export async function GET(req: Request) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   const { searchParams } = new URL(req.url)
   const accountId = searchParams.get('accountId')
   const strategyId = searchParams.get('strategyId')
@@ -10,6 +18,7 @@ export async function GET(req: Request) {
   try {
     const trades = await prisma.trade.findMany({
       where: {
+        account: { userId: user.id }, // أمان: جلب صفقات هذا المستخدم فقط
         AND: [
           accountId && accountId !== 'all' ? { accountId } : {},
           strategyId ? { strategyId } : {},
@@ -31,6 +40,13 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
     const body = await req.json()
     const {
@@ -44,8 +60,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Account ID is required" }, { status: 400 })
     }
 
-    const account = await prisma.account.findUnique({ where: { id: accountId } })
-    if (!account) return NextResponse.json({ error: "Account not found" }, { status: 404 })
+    // التأكد من أن الحساب يخص المستخدم الحالي
+    const account = await prisma.account.findUnique({
+      where: { id: accountId, userId: user.id }
+    })
+
+    if (!account) return NextResponse.json({ error: "Account not found or access denied" }, { status: 404 })
 
     const metrics = calculateTradeMetrics({
       entry: parseFloat(entryPrice) || 0,
@@ -57,11 +77,9 @@ export async function POST(req: Request) {
       accountBalance: account.currentBalance
     })
 
-    // Manual P&L and Manual R multiple support
     const finalPnl = pnl !== null && pnl !== undefined && pnl !== "" ? parseFloat(pnl) : metrics.pnl
     const finalActualR = actualR !== null && actualR !== undefined && actualR !== "" ? parseFloat(actualR) : metrics.actualR
 
-    // Enforce Result logic: Result follows P&L
     let finalResult = "BREAKEVEN"
     if (finalPnl > 0) finalResult = "WIN"
     else if (finalPnl < 0) finalResult = "LOSS"
@@ -93,18 +111,20 @@ export async function POST(req: Request) {
           riskPercent: metrics.riskPercent,
           rewardToRisk: metrics.rewardToRisk,
           status: "CLOSED",
+          // ربط الأخطاء بالمستخدم الحالي
           mistakes: {
             connectOrCreate: (mistakes || []).map((m: string) => ({
-              where: { name: m },
-              create: { name: m }
+              where: { name_userId: { name: m, userId: user.id } },
+              create: { name: m, userId: user.id }
             }))
           },
+          // ربط التاغات بالمستخدم الحالي
           tags: {
             create: (tags || []).map((t: string) => ({
               tag: {
                 connectOrCreate: {
-                  where: { name: t },
-                  create: { name: t }
+                  where: { name_userId: { name: t, userId: user.id } },
+                  create: { name: t, userId: user.id }
                 }
               }
             }))
@@ -118,7 +138,6 @@ export async function POST(req: Request) {
         }
       })
 
-      // Update account balance
       await tx.account.update({
         where: { id: accountId },
         data: {
@@ -128,7 +147,6 @@ export async function POST(req: Request) {
         }
       })
 
-      // Create snapshot for the chart
       await tx.accountSnapshot.create({
         data: {
           accountId,

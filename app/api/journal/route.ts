@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { createClient } from '@/lib/supabase-server'
 import { startOfDay, endOfDay } from "date-fns"
 
 export async function GET(req: Request) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const dateStr = searchParams.get('date')
   const date = dateStr ? new Date(dateStr) : new Date()
 
   try {
-    const user = await prisma.user.findUnique({ where: { email: "trader@example.com" } })
-    if (!user) return NextResponse.json({})
-
     const entry = await prisma.journalEntry.findFirst({
       where: {
         userId: user.id,
@@ -27,6 +30,11 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   try {
     const body = await req.json()
     const {
@@ -35,16 +43,6 @@ export async function POST(req: Request) {
     } = body
 
     const entryDate = new Date(date)
-
-    // Ensure user exists
-    const user = await prisma.user.upsert({
-      where: { email: "trader@example.com" },
-      update: {},
-      create: {
-        email: "trader@example.com",
-        name: "Professional Trader",
-      },
-    })
 
     const entry = await prisma.journalEntry.upsert({
       where: {

@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { createClient } from '@/lib/supabase-server'
 
 export async function GET() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
     const accounts = await prisma.account.findMany({
+      where: { userId: user.id },
       include: {
         _count: {
           select: { trades: true }
@@ -17,19 +26,16 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
     const body = await req.json()
     const { name, initialBalance, currency, profitTarget, maxDrawdown, dailyLossLimit, accountType } = body
-
-    // Always ensure a default user exists and get their actual ID
-    const user = await prisma.user.upsert({
-      where: { email: "trader@example.com" },
-      update: {},
-      create: {
-        email: "trader@example.com",
-        name: "Professional Trader",
-      },
-    })
 
     const account = await prisma.account.create({
       data: {

@@ -56,13 +56,16 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
 
   if (!trade) return notFound()
 
-  // Use P&L to determine win/loss state for UI colors
+  // تحديد حالة الربح أو الخسارة بناءً على الرقم
   const pnlValue = trade.pnl || 0
   const isWin = pnlValue > 0
   const isLoss = pnlValue < 0
 
+  // حماية مصفوفة الصور من الـ undefined
   const images = trade.images || []
-  const mainImage = images.find((img: any) => img.type === "AFTER") || images[0]
+  const mainImage = images.length > 0
+    ? (images.find((img: any) => img.type === "AFTER") || images[0])
+    : null
 
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this trade?")) return
@@ -76,10 +79,10 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
-      {/* High-Resolution Zoom Modal */}
+      {/* نافذة التكبير - Zoom Modal */}
       {isZoomed && mainImage && (
         <div
-          className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center p-4 cursor-zoom-out backdrop-blur-md"
+          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out backdrop-blur-md"
           onClick={() => setIsZoomed(false)}
         >
           <button className="absolute top-6 right-6 p-3 bg-white/10 rounded-full hover:bg-white/20 transition-all border border-white/10">
@@ -183,8 +186,8 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
         {/* CENTER: Main Chart Display */}
         <div className="col-span-12 lg:col-span-6 space-y-6">
           <div className={cn(
-            "bg-card border rounded-xl overflow-hidden shadow-2xl relative group transition-all duration-300",
-            isWin ? "border-success/20 shadow-success/5" : isLoss ? "border-danger/20 shadow-danger/5" : "border-border"
+            "bg-card border rounded-xl overflow-hidden shadow-2xl relative group transition-all duration-300 border-t-4",
+            isWin ? "border-success shadow-success/10" : isLoss ? "border-danger shadow-danger/10" : "border-border"
           )}>
             <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
@@ -292,7 +295,7 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
              <div className="text-[11px] text-neutral-300 leading-relaxed font-medium relative z-10 italic">
                {isWin ? "Execution high efficiency. Setup verified against model parameters." : isLoss ? "Capital preservation successful. Loss contained within risk parameters." : "Breakeven exit. Market conditions shifted away from high-probability model."}
              </div>
-             <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '20px 24px' }} />
+             <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
           </div>
         </div>
       </div>

@@ -1,13 +1,28 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { createClient } from '@/lib/supabase-server'
 import { format } from "date-fns"
 
 export async function GET(req: Request) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   const { searchParams } = new URL(req.url)
   const accountId = searchParams.get('accountId')
 
   try {
-    const tradeWhere = accountId && accountId !== 'all' ? { accountId } : {}
+    // تحديد فلتر البحث: حسابات المستخدم الحالي فقط
+    const tradeWhere: any = {
+      account: { userId: user.id }
+    }
+
+    if (accountId && accountId !== 'all') {
+      tradeWhere.accountId = accountId
+    }
 
     const trades = await prisma.trade.findMany({
       where: tradeWhere,
@@ -23,17 +38,21 @@ export async function GET(req: Request) {
       return NextResponse.json({ isEmpty: true })
     }
 
-    // Get initial balance(s) for the equity curve
+    // حساب الرصيد الابتدائي (Starting Balance) للمستخدم الحالي فقط
     let startingBalance = 0
     if (accountId && accountId !== 'all') {
-      const acc = await prisma.account.findUnique({ where: { id: accountId } })
+      const acc = await prisma.account.findUnique({
+        where: { id: accountId, userId: user.id }
+      })
       startingBalance = acc?.initialBalance || 0
     } else {
-      const allAccs = await prisma.account.findMany()
-      startingBalance = allAccs.reduce((sum, a) => sum + a.initialBalance, 0)
+      const userAccounts = await prisma.account.findMany({
+        where: { userId: user.id }
+      })
+      startingBalance = userAccounts.reduce((sum, a) => sum + a.initialBalance, 0)
     }
 
-    // 1. Equity Curve (Cumulative P&L)
+    // 1. منحنى الأسهم (Equity Curve)
     let runningBalance = startingBalance
     const equityCurve = trades.map(t => {
       runningBalance += (t.pnl || 0)
@@ -43,7 +62,7 @@ export async function GET(req: Request) {
       }
     })
 
-    // 2. P&L by Day of Week
+    // 2. الربح والخسارة حسب أيام الأسبوع
     const pnlByDay: Record<string, number> = {
       'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0
     }
@@ -55,11 +74,11 @@ export async function GET(req: Request) {
     })
     const pnlByDayChart = Object.entries(pnlByDay).map(([day, pnl]) => ({ day, pnl }))
 
-    // 3. Win Rate (Real Data: P&L > 0)
+    // 3. نسبة النجاح (Win Rate)
     const winningTrades = trades.filter(t => (t.pnl || 0) > 0)
     const winRate = (winningTrades.length / trades.length) * 100
 
-    // 4. Strategy Performance
+    // 4. أداء الاستراتيجيات
     const strategyPerf: Record<string, { name: string, pnl: number }> = {}
     trades.forEach(t => {
       const name = t.strategy?.name || 'No Strategy'
@@ -67,7 +86,7 @@ export async function GET(req: Request) {
       strategyPerf[name].pnl += (t.pnl || 0)
     })
 
-    // 5. Mistake Impact
+    // 5. تأثير الأخطاء (Mistake Impact)
     const mistakeImpact: Record<string, { name: string, count: number, loss: number }> = {}
     trades.forEach(t => {
       t.mistakes.forEach(m => {
@@ -79,11 +98,11 @@ export async function GET(req: Request) {
       })
     })
 
-    // Additional Performance Stats
+    // إحصائيات إضافية (Profit Factor)
     const sumGains = winningTrades.reduce((sum, t) => sum + (t.pnl || 0), 0)
     const losingTrades = trades.filter(t => (t.pnl || 0) < 0)
     const sumLosses = Math.abs(losingTrades.reduce((sum, t) => sum + (t.pnl || 0), 0))
-    const profitFactor = sumLosses > 0 ? sumGains / sumLosses : sumGains > 0 ? 99 : 0
+    const profitFactor = sumLosses > 0 ? sumGains / sumLosses : sumGains > 0 ? 9.99 : 0
 
     return NextResponse.json({
       equityCurve,

@@ -4,16 +4,19 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL") // هاد المتغير كيعطيه Neon أو Vercel
-  directUrl = env("DIRECT_URL")   // هاد المتغير ضروري للـ Migrations
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id             String         @id @default(cuid())
+  id             String         @id
   email          String         @unique
   name           String?
   accounts       Account[]
   journalEntries JournalEntry[]
+  strategies     Strategy[]
+  mistakes       Mistake[]
+  tags           Tag[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -67,7 +70,7 @@ model Trade {
   postTradeReview String?
   emotion         String?
   accountId       String
-  account         Account      @relation(fields: [accountId], references: [id])
+  account         Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
   images          TradeImage[]
   tags            TradeTag[]
   mistakes        Mistake[]    @relation("TradeMistakes")
@@ -88,6 +91,8 @@ model Strategy {
   id          String   @id @default(cuid())
   name        String
   description String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
   trades      Trade[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -95,8 +100,12 @@ model Strategy {
 
 model Tag {
   id     String     @id @default(cuid())
-  name   String     @unique
+  name   String
+  userId String
+  user   User       @relation(fields: [userId], references: [id])
   trades TradeTag[]
+
+  @@unique([name, userId])
 }
 
 model TradeTag {
@@ -110,9 +119,13 @@ model TradeTag {
 
 model Mistake {
   id          String   @id @default(cuid())
-  name        String   @unique
+  name        String
   description String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
   trades      Trade[]  @relation("TradeMistakes")
+
+  @@unique([name, userId])
 }
 
 model AccountSnapshot {

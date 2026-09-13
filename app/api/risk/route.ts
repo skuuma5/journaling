@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { createClient } from '@/lib/supabase-server'
 import { startOfDay } from "date-fns"
 
 export async function GET() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
     const accounts = await prisma.account.findMany({
+      where: { userId: user.id },
       include: {
         trades: {
           where: {
