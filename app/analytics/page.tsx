@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -9,9 +9,7 @@ import {
 import { StatCard } from "@/components/StatCard"
 import { BarChart3, TrendingUp, Calendar, Target, Activity, Loader2, Filter } from "lucide-react"
 
-const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b', '#8b5cf6', '#ec4899']
-
-export default function AnalyticsPage() {
+function AnalyticsContent() {
   const searchParams = useSearchParams()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -96,7 +94,6 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Equity Curve */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <TrendingUp className="w-4 h-4 text-success" />
@@ -123,7 +120,6 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* Daily P&L */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Calendar className="w-4 h-4 text-blue-500" />
@@ -148,7 +144,6 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* Win Rate Distribution */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Activity className="w-4 h-4 text-purple-500" />
@@ -183,7 +178,6 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* Strategy Performance */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Target className="w-4 h-4 text-yellow-500" />
@@ -207,7 +201,6 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          {/* Mistake Impact Table */}
           <div className="bg-card border border-border rounded-xl overflow-hidden shadow-2xl">
             <div className="p-6 border-b border-border bg-neutral-900/20">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] flex items-center gap-2 text-neutral-400">
@@ -251,5 +244,18 @@ export default function AnalyticsPage() {
         </>
       )}
     </div>
+  )
+}
+
+export default function AnalyticsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
+        <Loader2 className="w-8 h-8 text-white animate-spin" />
+        <p className="text-muted-foreground font-black uppercase tracking-[0.3em] text-[10px]">Loading Terminal Analytics...</p>
+      </div>
+    }>
+      <AnalyticsContent />
+    </Suspense>
   )
 }
