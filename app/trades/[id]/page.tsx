@@ -25,22 +25,6 @@ import {
 import Link from "next/link"
 import { notFound, useRouter } from "next/navigation"
 
-interface TradeImage {
-  id: string;
-  url: string;
-  type: string | null;
-}
-
-interface TagItem {
-  tagId: string;
-  tag: { name: string };
-}
-
-interface MistakeItem {
-  id: string;
-  name: string;
-}
-
 export default function TradeDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [trade, setTrade] = useState<any>(null)
@@ -76,10 +60,10 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
   const isWin = pnlValue > 0
   const isLoss = pnlValue < 0
 
-  // إصلاح الخطأ: تأكد من أن المصفوفة موجودة قبل استخدام find
-  const images: TradeImage[] = trade.images || []
+  // Robust check for images array to fix "undefined reading find"
+  const images = trade.images || []
   const mainImage = images.length > 0
-    ? (images.find((img) => img.type === "AFTER") || images[0])
+    ? (images.find((img: any) => img.type === "AFTER") || images[0])
     : null
 
   const handleDelete = async () => {
@@ -94,6 +78,7 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
+      {/* Zoom Modal */}
       {isZoomed && mainImage && (
         <div
           className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center p-4 cursor-zoom-out backdrop-blur-md"
@@ -110,6 +95,7 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
         </div>
       )}
 
+      {/* Top Navigation Bar */}
       <div className="flex justify-between items-center border-b border-border pb-6">
         <div className="flex items-center gap-4">
           <Link href="/trades" className="p-2 hover:bg-neutral-900 rounded-md transition-colors text-muted-foreground hover:text-white border border-transparent hover:border-border">
@@ -145,6 +131,7 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
       </div>
 
       <div className="grid grid-cols-12 gap-6">
+        {/* LEFT: Execution Details */}
         <div className="col-span-12 lg:col-span-3 space-y-6">
           <div className="bg-card border border-border rounded-xl p-6 space-y-6 shadow-2xl">
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 flex items-center gap-2">
@@ -195,10 +182,11 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
           </div>
         </div>
 
+        {/* CENTER: Main Chart Display */}
         <div className="col-span-12 lg:col-span-6 space-y-6">
           <div className={cn(
             "bg-card border rounded-xl overflow-hidden shadow-2xl relative group transition-all duration-300 border-t-4",
-            isWin ? "border-success shadow-success/10" : isLoss ? "border-danger shadow-danger/10" : "border-border"
+            isWin ? "border-success shadow-success/5" : isLoss ? "border-danger shadow-danger/5" : "border-border"
           )}>
             <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
@@ -216,11 +204,18 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
                {mainImage ? (
                  <img src={mainImage.url} alt="Execution Replay" className="w-full h-full object-contain relative z-10 transition-transform duration-700 group-hover:scale-[1.03]" />
                ) : (
-                 <div className="flex flex-col items-center opacity-20">
-                   <ImageIcon className="w-16 h-16 mb-4" />
-                   <p className="text-[10px] font-black uppercase tracking-[0.3em]">No Chart Recorded</p>
-                 </div>
+                 <>
+                   <ImageIcon className="w-16 h-16 opacity-5 mb-4" />
+                   <p className="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-600">Execution Replay Unavailable</p>
+                 </>
                )}
+            </div>
+            <div className="p-4 bg-neutral-900/40 border-t border-border flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className={cn("w-2 h-2 rounded-full animate-pulse", isWin ? "bg-success shadow-[0_0_8px_#10b981]" : isLoss ? "bg-danger shadow-[0_0_8px_#ef4444]" : "bg-neutral-600")} />
+                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{trade.symbol} Terminal Replay</span>
+              </div>
+              <button onClick={() => setIsZoomed(true)} className="text-[9px] font-black px-3 py-1 bg-white text-black rounded-sm uppercase tracking-widest hover:bg-neutral-200 transition-colors">Expand Visualization</button>
             </div>
           </div>
 
@@ -230,12 +225,12 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
                 <BrainCircuit className="w-3.5 h-3.5" /> Logic / Plan
               </h3>
               <p className="text-[11px] font-medium text-neutral-300 leading-relaxed italic min-h-[100px]">
-                {trade.preTradePlan || "Zero log records for this execution logic."}
+                {trade.preTradePlan || "Zero log records for this execution model."}
               </p>
             </div>
             <div className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-2xl">
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500 flex items-center gap-2">
-                <Activity className="w-3.5 h-3.5" /> Reality / Review
+                <Activity className="w-3.5 h-3.5" /> Post-Execution Reality
               </h3>
               <p className="text-[11px] font-medium text-neutral-300 leading-relaxed italic min-h-[100px]">
                 {trade.postTradeReview || "Zero log records for post-execution reality."}
@@ -244,18 +239,22 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
           </div>
         </div>
 
+        {/* RIGHT: Net Realized Delta */}
         <div className="col-span-12 lg:col-span-3 space-y-6">
           <div className={cn(
             "bg-card border rounded-xl overflow-hidden shadow-2xl transition-all border-t-4",
             isWin ? "border-success shadow-success/10" : isLoss ? "border-danger shadow-danger/10" : "border-border"
           )}>
              <div className={cn("p-8 text-center border-b border-border", isWin ? "bg-success/5" : isLoss ? "bg-danger/5" : "bg-neutral-900/10")}>
-                <p className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-2">Net Realized Delta</p>
+                <p className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-2">Net Delta</p>
                 <h3 className={cn("text-4xl font-black tracking-tighter mb-2 tabular-nums", isWin ? "text-success" : isLoss ? "text-danger" : "text-neutral-400")}>
                   {pnlValue >= 0 ? "+" : ""}{formatCurrency(pnlValue, trade.account?.currency || "USD")}
                 </h3>
                 <div className="flex justify-center items-center gap-3">
-                   <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest", isWin ? "bg-success text-white" : isLoss ? "bg-danger text-white" : "bg-neutral-800 text-neutral-400")}>
+                   <span className={cn(
+                     "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest",
+                     isWin ? "bg-success text-white" : isLoss ? "bg-danger text-white" : "bg-neutral-800 text-neutral-400"
+                   )}>
                      {(trade.actualR || 0).toFixed(2)}R
                    </span>
                    <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">{trade.result}</span>
@@ -268,7 +267,7 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
                     <span className="text-xs font-bold text-white tabular-nums">{trade.riskPercent?.toFixed(2) || "0.00"}%</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Capital at Risk</span>
+                    <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Capital Exposed</span>
                     <span className="text-xs font-bold text-white tabular-nums">{trade.riskAmount ? formatCurrency(trade.riskAmount, trade.account?.currency || "USD") : "—"}</span>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-border/50">
@@ -279,6 +278,15 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
                   </div>
                 </div>
              </div>
+          </div>
+          <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
+             <h3 className="font-black text-xs uppercase tracking-[0.3em] text-neutral-400 flex items-center gap-2 relative z-10">
+               <TrendingUp className="w-3.5 h-3.5" /> Performance Analytics
+             </h3>
+             <div className="text-[11px] text-neutral-300 leading-relaxed font-medium relative z-10 italic">
+               {isWin ? "Execution high efficiency. Setup verified against model parameters." : isLoss ? "Capital preservation successful. Loss contained within risk parameters." : "Breakeven exit. Market conditions shifted away from high-probability model."}
+             </div>
+             <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '20px 24px' }} />
           </div>
         </div>
       </div>

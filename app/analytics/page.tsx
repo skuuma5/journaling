@@ -9,19 +9,34 @@ import {
 import { StatCard } from "@/components/StatCard"
 import { BarChart3, TrendingUp, Calendar, Target, Activity, Loader2, Filter } from "lucide-react"
 
+// إجبار الصفحة على أن تكون ديناميكية لتجنب أخطاء Pre-rendering في Vercel
+export const dynamic = 'force-dynamic';
+
+const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b', '#8b5cf6', '#ec4899']
+
 function AnalyticsContent() {
   const searchParams = useSearchParams()
+
+  // استخدام useEffect لتحديث الحالة بدلاً من القيمة الابتدائية المباشرة
+  const [selectedAccountId, setSelectedAccountId] = useState("all")
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [accounts, setAccounts] = useState<any[]>([])
-  const [selectedAccountId, setSelectedAccountId] = useState(searchParams.get('accountId') || "all")
+
+  // تحديث الحساب المختار عند تغير الـ URL
+  useEffect(() => {
+    const accountId = searchParams.get('accountId')
+    if (accountId) {
+      setSelectedAccountId(accountId)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     async function fetchAccounts() {
       try {
         const res = await fetch('/api/accounts')
         const json = await res.json()
-        setAccounts(json)
+        if (Array.isArray(json)) setAccounts(json)
       } catch (e) {
         console.error(e)
       }
@@ -89,8 +104,8 @@ function AnalyticsContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Accuracy" value={`${data.winRate.toFixed(1)}%`} subValue="Verified" trend={data.winRate >= 60 ? "up" : "neutral"} />
             <StatCard label="Total Vol" value={data.totalTrades} subValue="Executions" trend="neutral" />
-            <StatCard label="Profit Factor" value={data.profitFactor.toFixed(2)} subValue="Edge Index" trend={data.profitFactor >= 1.5 ? "up" : "neutral"} />
-            <StatCard label="Equity Status" value="Healthy" subValue="Risk Managed" trend="up" />
+            <StatCard label="Profit Factor" value={data.profitFactor?.toFixed(2) || "0.00"} subValue="Edge Index" trend={data.profitFactor >= 1.5 ? "up" : "neutral"} />
+            <StatCard label="Equity Status" value="Active" subValue="Risk Managed" trend="up" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -252,7 +267,7 @@ export default function AnalyticsPage() {
     <Suspense fallback={
       <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
         <Loader2 className="w-8 h-8 text-white animate-spin" />
-        <p className="text-muted-foreground font-black uppercase tracking-[0.3em] text-[10px]">Loading Terminal Analytics...</p>
+        <p className="text-muted-foreground font-black uppercase tracking-[0.3em] text-[10px]">Syncing Analytics Terminal...</p>
       </div>
     }>
       <AnalyticsContent />
