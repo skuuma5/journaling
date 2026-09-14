@@ -14,7 +14,6 @@ import { notFound } from "next/navigation"
 import { StatCard } from "@/components/StatCard"
 import { format } from "date-fns"
 
-// تعريف النوع الصريح للصفقة لضمان توافقه مع TypeScript
 interface TradeItem {
   id: string;
   date: Date;
@@ -43,27 +42,26 @@ async function getAccountData(id: string) {
 
   if (!account) return null
 
-  // تحديد نوع المصفوفة بشكل صريح لتجنب implicit any
-  const allTrades = (account.trades || []) as TradeItem[];
+  const allTrades: any[] = (account.trades || []) as any[];
 
-  const wins = allTrades.filter((t: TradeItem) => t.result === 'WIN').length
+  const wins = allTrades.filter((t: any) => t.result === 'WIN').length
   const winRate = allTrades.length > 0 ? (wins / allTrades.length) * 100 : 0
 
-  const winners = allTrades.filter((t: TradeItem) => (t.pnl || 0) > 0)
-  const losers = allTrades.filter((t: TradeItem) => (t.pnl || 0) < 0)
+  const winners = allTrades.filter((t: any) => (t.pnl || 0) > 0)
+  const losers = allTrades.filter((t: any) => (t.pnl || 0) < 0)
 
   const avgWin = winners.length > 0
-    ? winners.reduce((sum: number, t: TradeItem) => sum + (t.pnl || 0), 0) / winners.length
+    ? winners.reduce((sum: any, t: any) => sum + (t.pnl || 0), 0) / winners.length
     : 0
 
   const avgLoss = losers.length > 0
-    ? Math.abs(losers.reduce((sum: number, t: TradeItem) => sum + (t.pnl || 0), 0) / losers.length)
+    ? Math.abs(losers.reduce((sum: any, t: any) => sum + (t.pnl || 0), 0) / losers.length)
     : 0
 
   const profitFactor = avgLoss > 0 ? avgWin / avgLoss : 0
 
-  const bestTrade = winners.length > 0 ? Math.max(...winners.map((t: TradeItem) => t.pnl || 0)) : 0
-  const worstTrade = losers.length > 0 ? Math.min(...losers.map((t: TradeItem) => t.pnl || 0)) : 0
+  const bestTrade = winners.length > 0 ? Math.max(...winners.map((t: any) => t.pnl || 0)) : 0
+  const worstTrade = losers.length > 0 ? Math.min(...losers.map((t: any) => t.pnl || 0)) : 0
 
   const pnl = account.currentBalance - account.initialBalance
   const pnlPercent = (pnl / account.initialBalance) * 100
@@ -77,7 +75,7 @@ async function getAccountData(id: string) {
       profitFactor,
       totalTrades: allTrades.length,
       avgR: allTrades.length > 0
-        ? allTrades.reduce((sum: number, t: TradeItem) => sum + (t.actualR || 0), 0) / allTrades.length
+        ? allTrades.reduce((sum: any, t: any) => sum + (t.actualR || 0), 0) / allTrades.length
         : 0,
       bestTrade,
       worstTrade,
