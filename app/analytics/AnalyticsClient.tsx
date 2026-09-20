@@ -7,7 +7,8 @@ import {
   AreaChart, Area, PieChart, Pie, Cell, Legend
 } from 'recharts'
 import { StatCard } from "@/components/StatCard"
-import { BarChart3, TrendingUp, Calendar, Target, Activity, Loader2, Filter, Clock, Globe } from "lucide-react"
+import { BarChart3, TrendingUp, Calendar, Target, Activity, Loader2, Filter, Globe, AlertTriangle } from "lucide-react"
+import { formatCurrency } from "@/lib/utils"
 
 const COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6']
 
@@ -66,7 +67,7 @@ function AnalyticsUI() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Terminal Analytics</h2>
-          <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest">Deep execution audit & session analysis.</p>
+          <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest">Deep execution audit & edge analysis.</p>
         </div>
 
         <div className="relative w-full md:w-64">
@@ -96,11 +97,11 @@ function AnalyticsUI() {
             <StatCard label="Accuracy" value={`${data.winRate.toFixed(1)}%`} subValue="Verified" trend={data.winRate >= 60 ? "up" : "neutral"} />
             <StatCard label="Total Vol" value={data.totalTrades} subValue="Executions" trend="neutral" />
             <StatCard label="Profit Factor" value={data.profitFactor?.toFixed(2) || "0.00"} subValue="Edge Index" trend={data.profitFactor >= 1.5 ? "up" : "neutral"} />
-            <StatCard label="Best Session" value={data.sessionStats.sort((a: any, b: any) => b.pnl - a.pnl)[0]?.name || "N/A"} subValue="By Profitability" trend="up" />
+            <StatCard label="Session Edge" value={data.sessionStats.sort((a: any, b: any) => b.pnl - a.pnl)[0]?.name || "N/A"} subValue="Most Profitable" trend="up" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Equity Curve */}
+            {/* Capital Appreciation Chart */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <TrendingUp className="w-4 h-4 text-success" />
@@ -127,11 +128,11 @@ function AnalyticsUI() {
               </div>
             </div>
 
-            {/* Session Stats Chart */}
+            {/* Trading Sessions Chart - UPDATED DESIGN */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Globe className="w-4 h-4 text-blue-500" />
-                Trading Sessions (Asia, London, NY)
+                Session Distribution (P&L vs Trades Count)
               </h3>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -141,15 +142,16 @@ function AnalyticsUI() {
                     <YAxis yAxisId="left" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
                     <YAxis yAxisId="right" orientation="right" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
                     <Tooltip
+                      cursor={{fill: '#171717'}}
                       contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', fontSize: '12px' }}
                     />
-                    <Legend wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }} />
-                    <Bar yAxisId="left" dataKey="pnl" name="Net P&L" radius={[2, 2, 0, 0]}>
+                    <Legend wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', fontWeight: '900', letterSpacing: '0.1em', paddingTop: '20px' }} />
+                    <Bar yAxisId="left" dataKey="pnl" name="Total P&L ($)" radius={[2, 2, 0, 0]}>
                       {data.sessionStats.map((entry: any, index: number) => (
                         <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />
                       ))}
                     </Bar>
-                    <Bar yAxisId="right" dataKey="count" name="Trade Vol" fill="#6366f1" radius={[2, 2, 0, 0]} />
+                    <Bar yAxisId="right" dataKey="count" name="Trades Entered" fill="#6366f1" radius={[2, 2, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -180,7 +182,7 @@ function AnalyticsUI() {
               </div>
             </div>
 
-            {/* Probability Distribution */}
+            {/* Execution Probability */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Activity className="w-4 h-4 text-purple-500" />
@@ -216,12 +218,12 @@ function AnalyticsUI() {
             </div>
           </div>
 
-          {/* Model Efficiency & Behavioral Audit */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+             {/* Model Efficiency */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Target className="w-4 h-4 text-yellow-500" />
-                Model Efficiency
+                Model Efficiency (by Strategy)
               </h3>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -240,35 +242,44 @@ function AnalyticsUI() {
               </div>
             </div>
 
+            {/* Behavioral Audit (Leaks) - FIXED DESIGN */}
             <div className="bg-card border border-border rounded-xl overflow-hidden shadow-2xl">
-              <div className="p-6 border-b border-border bg-neutral-900/20">
-                <h3 className="font-black text-xs uppercase tracking-[0.3em] flex items-center gap-2 text-neutral-400">
-                  <BarChart3 className="w-4 h-4 text-danger" />
-                  Behavioral Audit (Leakage)
+              <div className="p-6 border-b border-border bg-neutral-900/20 flex items-center justify-between">
+                <h3 className="font-black text-xs uppercase tracking-[0.3em] flex items-center gap-2 text-danger">
+                  <AlertTriangle className="w-4 h-4" />
+                  Process Leaks (Behavioral Audit)
                 </h3>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left">
+                <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground border-b border-border bg-neutral-900/10">
+                    <tr className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 border-b border-border bg-neutral-900/30">
                       <th className="px-6 py-4 font-black">Process Error</th>
-                      <th className="px-6 py-4 font-black text-center">Frequency</th>
-                      <th className="px-6 py-4 text-right font-black">Financial Impact</th>
+                      <th className="px-6 py-4 font-black text-center">Executions</th>
+                      <th className="px-6 py-4 text-right font-black">Capital Lost</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {data.byMistake.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-6 py-10 text-center text-xs text-muted-foreground italic uppercase tracking-widest font-black opacity-30">Zero behavioral breaches detected.</td>
-                      </tr>
-                    ) : (
+                    {data.byMistake && data.byMistake.length > 0 ? (
                       data.byMistake.map((m: any) => (
-                        <tr key={m.name} className="group hover:bg-neutral-900/30 transition-all">
-                          <td className="px-6 py-4 font-black text-white text-sm uppercase tracking-tight">{m.name}</td>
-                          <td className="px-6 py-4 text-xs text-neutral-400 text-center font-bold uppercase">{m.count} Executions</td>
-                          <td className="px-6 py-4 text-right font-black text-danger text-sm tabular-nums">-${Math.abs(m.loss).toFixed(2)}</td>
+                        <tr key={m.name} className="group hover:bg-danger/5 transition-all border-l-2 border-transparent hover:border-danger">
+                          <td className="px-6 py-5">
+                            <span className="font-black text-white text-sm uppercase tracking-tight">{m.name}</span>
+                          </td>
+                          <td className="px-6 py-5 text-center">
+                            <span className="text-[10px] font-black bg-neutral-800 px-2 py-1 rounded text-neutral-400 uppercase">{m.count} Times</span>
+                          </td>
+                          <td className="px-6 py-5 text-right font-black text-danger text-sm tabular-nums">
+                            -{formatCurrency(Math.abs(m.loss))}
+                          </td>
                         </tr>
                       ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-20 text-center text-xs text-neutral-600 italic uppercase tracking-widest font-black opacity-40">
+                          Zero process breaches detected. Terminal integrity optimal.
+                        </td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
@@ -286,7 +297,7 @@ export default function AnalyticsClient() {
     <Suspense fallback={
       <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
         <Loader2 className="w-8 h-8 text-white animate-spin" />
-        <p className="text-muted-foreground font-black uppercase tracking-[0.3em] text-[10px]">Loading Analytics...</p>
+        <p className="text-muted-foreground font-black uppercase tracking-[0.3em] text-[10px]">Syncing Analytics Terminal...</p>
       </div>
     }>
       <AnalyticsUI />
