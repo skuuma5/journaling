@@ -12,6 +12,19 @@ import { formatCurrency, cn } from "@/lib/utils"
 
 const COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6']
 
+// Improved Custom Tooltip for PieChart with high-contrast white text
+const CustomPieTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', padding: '12px', borderRadius: '8px', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)' }}>
+        <p style={{ color: '#fff', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>{payload[0].name}</p>
+        <p style={{ color: '#fff', fontSize: '14px', fontWeight: '800', fontFamily: 'monospace' }}>{payload[0].value.toFixed(1)}%</p>
+      </div>
+    )
+  }
+  return null
+}
+
 function AnalyticsUI() {
   const searchParams = useSearchParams()
   const [selectedAccountId, setSelectedAccountId] = useState(searchParams.get('accountId') || "all")
@@ -120,6 +133,8 @@ function AnalyticsUI() {
                     <YAxis stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', fontSize: '12px' }}
+                      itemStyle={{ color: '#fff' }}
+                      labelStyle={{ color: '#fff', fontWeight: 'bold' }}
                     />
                     <Area type="monotone" dataKey="balance" stroke="#10b981" fillOpacity={1} fill="url(#colorBalance)" strokeWidth={2} />
                   </AreaChart>
@@ -127,7 +142,6 @@ function AnalyticsUI() {
               </div>
             </div>
 
-            {/* Trading Sessions Chart - CLEAN DESIGN */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Globe className="w-4 h-4 text-blue-500" />
@@ -140,8 +154,10 @@ function AnalyticsUI() {
                     <XAxis dataKey="name" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} dy={10} />
                     <YAxis stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
                     <Tooltip
-                      cursor={{fill: '#171717'}}
+                      cursor={{fill: 'transparent'}}
                       contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', fontSize: '12px' }}
+                      itemStyle={{ color: '#fff' }}
+                      labelStyle={{ color: '#fff', fontWeight: 'bold' }}
                       formatter={(value: any, name: any) => {
                         if (name === "pnl") return [formatCurrency(value), "Net P&L"]
                         return [value, "Trades Entered"]
@@ -175,9 +191,12 @@ function AnalyticsUI() {
                     <XAxis dataKey="day" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} dy={10} />
                     <YAxis stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
                     <Tooltip
+                      cursor={{fill: 'transparent'}}
                       contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', fontSize: '12px' }}
+                      itemStyle={{ color: '#fff' }}
+                      labelStyle={{ color: '#fff', fontWeight: 'bold' }}
                     />
-                    <Bar dataKey="pnl" radius={[2, 2, 0, 0]}>
+                    <Bar dataKey="pnl" radius={[2, 2, 0, 0]} barSize={40}>
                       {data.pnlByDay.map((entry: any, index: number) => (
                         <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />
                       ))}
@@ -211,10 +230,10 @@ function AnalyticsUI() {
                       <Cell fill="#10b981" />
                       <Cell fill="#ef4444" />
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px' }} />
+                    <Tooltip content={<CustomPieTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="absolute flex flex-col items-center">
+                <div className="absolute flex flex-col items-center pointer-events-none">
                   <span className="text-3xl font-black text-white">{data.winRate.toFixed(1)}%</span>
                   <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Accuracy</span>
                 </div>
@@ -234,8 +253,13 @@ function AnalyticsUI() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#171717" horizontal={false} />
                     <XAxis type="number" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
                     <YAxis type="category" dataKey="name" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} width={100} />
-                    <Tooltip contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px' }} />
-                    <Bar dataKey="pnl" radius={[0, 2, 2, 0]}>
+                    <Tooltip
+                      cursor={{fill: 'transparent'}}
+                      contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', fontSize: '12px' }}
+                      itemStyle={{ color: '#fff' }}
+                      labelStyle={{ color: '#fff', fontWeight: 'bold' }}
+                    />
+                    <Bar dataKey="pnl" radius={[0, 2, 2, 0]} barSize={30}>
                       {data.byStrategy.map((entry: any, index: number) => (
                         <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />
                       ))}
