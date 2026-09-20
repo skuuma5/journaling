@@ -4,11 +4,11 @@ import { useEffect, useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  AreaChart, Area, PieChart, Pie, Cell, Legend
+  AreaChart, Area, PieChart, Pie, Cell, Legend, LabelList
 } from 'recharts'
 import { StatCard } from "@/components/StatCard"
 import { BarChart3, TrendingUp, Calendar, Target, Activity, Loader2, Filter, Globe, AlertTriangle } from "lucide-react"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, cn } from "@/lib/utils"
 
 const COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6']
 
@@ -101,7 +101,6 @@ function AnalyticsUI() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Capital Appreciation Chart */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <TrendingUp className="w-4 h-4 text-success" />
@@ -128,36 +127,42 @@ function AnalyticsUI() {
               </div>
             </div>
 
-            {/* Trading Sessions Chart - UPDATED DESIGN */}
+            {/* Trading Sessions Chart - CLEAN DESIGN */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Globe className="w-4 h-4 text-blue-500" />
-                Session Distribution (P&L vs Trades Count)
+                Session Performance (Net P&L)
               </h3>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.sessionStats}>
+                  <BarChart data={data.sessionStats} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#171717" vertical={false} />
                     <XAxis dataKey="name" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} dy={10} />
-                    <YAxis yAxisId="left" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
-                    <YAxis yAxisId="right" orientation="right" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
                     <Tooltip
                       cursor={{fill: '#171717'}}
                       contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', fontSize: '12px' }}
+                      formatter={(value: any, name: any) => {
+                        if (name === "pnl") return [formatCurrency(value), "Net P&L"]
+                        return [value, "Trades Entered"]
+                      }}
                     />
-                    <Legend wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', fontWeight: '900', letterSpacing: '0.1em', paddingTop: '20px' }} />
-                    <Bar yAxisId="left" dataKey="pnl" name="Total P&L ($)" radius={[2, 2, 0, 0]}>
+                    <Bar dataKey="pnl" name="pnl" radius={[4, 4, 0, 0]} barSize={50}>
                       {data.sessionStats.map((entry: any, index: number) => (
                         <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />
                       ))}
+                      <LabelList
+                        dataKey="count"
+                        position="top"
+                        formatter={(val: any) => `${val} Trades`}
+                        style={{ fontSize: '10px', fill: '#737373', fontWeight: '900', textTransform: 'uppercase' }}
+                      />
                     </Bar>
-                    <Bar yAxisId="right" dataKey="count" name="Trades Entered" fill="#6366f1" radius={[2, 2, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* Weekly Performance */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Calendar className="w-4 h-4 text-primary" />
@@ -182,7 +187,6 @@ function AnalyticsUI() {
               </div>
             </div>
 
-            {/* Execution Probability */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Activity className="w-4 h-4 text-purple-500" />
@@ -219,7 +223,6 @@ function AnalyticsUI() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-             {/* Model Efficiency */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Target className="w-4 h-4 text-yellow-500" />
@@ -242,7 +245,6 @@ function AnalyticsUI() {
               </div>
             </div>
 
-            {/* Behavioral Audit (Leaks) - FIXED DESIGN */}
             <div className="bg-card border border-border rounded-xl overflow-hidden shadow-2xl">
               <div className="p-6 border-b border-border bg-neutral-900/20 flex items-center justify-between">
                 <h3 className="font-black text-xs uppercase tracking-[0.3em] flex items-center gap-2 text-danger">
