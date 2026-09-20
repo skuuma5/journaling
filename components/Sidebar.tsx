@@ -92,8 +92,8 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile Header - Changed to sticky to avoid overlapping content */}
-      <div className="lg:hidden sticky top-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md border-b border-border z-[60] flex items-center justify-between px-4">
+      {/* Mobile Header - Compact & Sticky */}
+      <div className="xl:hidden fixed top-0 left-0 right-0 h-16 bg-background/95 backdrop-blur-md border-b border-border z-[60] flex items-center justify-between px-4">
         <Link href="/" onClick={closeSidebar} className="text-lg font-black tracking-tighter text-white flex items-center gap-2">
           <Activity className="w-5 h-5 text-white" />
           JOURNALING
@@ -106,20 +106,20 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Overlay */}
+      {/* Overlay - Darker and more blur for mobile focus */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[65] lg:hidden"
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[65] xl:hidden"
           onClick={closeSidebar}
         />
       )}
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container - Controlled by transform */}
       <div className={cn(
-        "flex flex-col h-screen w-[280px] lg:w-64 border-r border-border bg-card text-card-foreground fixed left-0 top-0 z-[70] transition-transform duration-300 ease-in-out lg:translate-x-0",
+        "flex flex-col h-screen w-[280px] xl:w-64 border-r border-border bg-card text-card-foreground fixed left-0 top-0 z-[70] transition-transform duration-300 ease-in-out xl:translate-x-0",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="p-6 hidden lg:block">
+        <div className="p-6 hidden xl:block border-b border-border/50">
           <Link href="/" onClick={closeSidebar} className="text-xl font-black tracking-tighter text-white flex items-center gap-2 group">
             <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center group-hover:rotate-6 transition-transform">
               <Activity className="w-5 h-5 text-black" />
@@ -128,8 +128,8 @@ export function Sidebar() {
           </Link>
         </div>
 
-        {/* Mobile Sidebar Close Button */}
-        <div className="lg:hidden p-6 flex justify-between items-center border-b border-border mb-4">
+        {/* Mobile Header in Sidebar */}
+        <div className="xl:hidden p-6 flex justify-between items-center border-b border-border mb-4">
           <span className="font-black text-white tracking-widest text-xs uppercase">Terminal Menu</span>
           <button onClick={closeSidebar} className="p-2 text-muted-foreground hover:text-white">
             <X className="w-5 h-5" />
@@ -137,7 +137,6 @@ export function Sidebar() {
         </div>
 
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
-          <p className="px-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 opacity-50">Main Menu</p>
           {filteredMenuItems.map((item) => (
             <Link
               key={item.name}
@@ -148,18 +147,15 @@ export function Sidebar() {
                 pathname === item.href ? "bg-white text-black shadow-lg" : "text-muted-foreground hover:bg-neutral-900 hover:text-white"
               )}
             >
-              <item.icon className={cn(
-                "w-4 h-4",
-                pathname === item.href ? "text-black" : "text-muted-foreground group-hover:text-white"
-              )} />
+              <item.icon className="w-4 h-4" />
               {item.name}
             </Link>
           ))}
 
           {!hasAccounts && (
             <div className="mt-6 mx-3 p-4 bg-primary/5 border border-primary/10 rounded-lg">
-              <p className="text-[10px] font-black text-primary uppercase tracking-widest leading-tight">Terminal Required</p>
-              <p className="text-[9px] text-muted-foreground mt-2 font-medium">Create an account to unlock all features.</p>
+              <p className="text-[10px] font-black text-primary uppercase tracking-widest leading-tight">Initialization Required</p>
+              <p className="text-[9px] text-muted-foreground mt-2 font-medium">Create a terminal to unlock full analytics.</p>
             </div>
           )}
         </nav>
@@ -178,7 +174,7 @@ export function Sidebar() {
                     pathname === `/accounts/${account.id}` ? "border-border bg-neutral-900/50" : ""
                   )}
                 >
-                  <div className={cn("w-2 h-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]", account.status === "HEALTHY" ? "bg-success" : "bg-danger")} />
+                  <div className={cn("w-2 h-2 rounded-full", account.status === "HEALTHY" ? "bg-success" : "bg-danger")} />
                   <p className="text-[10px] font-black text-white truncate uppercase tracking-tight">{account.name}</p>
                 </Link>
               ))}

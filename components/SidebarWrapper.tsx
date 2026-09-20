@@ -22,10 +22,10 @@ export function SidebarWrapper({ children }: { children: React.ReactNode }) {
       {!isAuthPage && <Sidebar />}
       <main className={cn(
         "flex-1 min-h-screen transition-all duration-300 w-full",
-        // pt-32 on mobile (lg:pt-8) to give enough space below the fixed header
-        !isAuthPage ? "lg:ml-64 pt-32 lg:pt-8 p-4 md:p-8" : "ml-0 p-4 md:p-8"
+        // Sidebar is hidden on mobile, margin only for lg screens (1024px+)
+        !isAuthPage ? "lg:ml-64 pt-16 lg:pt-0" : "ml-0"
       )}>
-        <div className="max-w-[1400px] mx-auto overflow-x-hidden">
+        <div className="p-4 md:p-8 max-w-[1400px] mx-auto overflow-x-hidden">
           {children}
         </div>
       </main>

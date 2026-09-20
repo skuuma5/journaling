@@ -8,18 +8,19 @@ import { cn } from "@/lib/utils"
 
 interface AudioRecorderProps {
   onAudioSaved: (audioId: string, audioUrl?: string) => void
+  onUploadingStateChange?: (uploading: boolean) => void
   initialAudioId?: string
   initialAudioUrl?: string
   onDelete?: () => void
 }
 
-export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAudioUrl, onDelete }: AudioRecorderProps) {
+export default function AudioRecorder({ onAudioSaved, onUploadingStateChange, initialAudioId, initialAudioUrl, onDelete }: AudioRecorderProps) {
   const [mounted, setMounted] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(initialAudioUrl || null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(30)
+  const [timeLeft, setTimeLeft] = useState(20) // Reduced to 20s
   const [audioId, setAudioId] = useState<string | null>(initialAudioId || null)
 
   const mediaRecorder = useRef<MediaRecorder | null>(null)
@@ -34,7 +35,13 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
     }
   }, [initialAudioId, initialAudioUrl])
 
-  // Stop recording automatically at 30 seconds
+  useEffect(() => {
+    if (onUploadingStateChange) {
+      onUploadingStateChange(isUploading)
+    }
+  }, [isUploading, onUploadingStateChange])
+
+  // Stop recording automatically at 20 seconds
   useEffect(() => {
     if (isRecording && timeLeft <= 0) {
       stopRecording()
@@ -44,20 +51,10 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
   async function loadLocalAudio(id: string) {
     try {
       const blob = await getAudio(id)
-      if (blob) {
-        setAudioUrl(URL.createObjectURL(blob))
-      }
+      if (blob) setAudioUrl(URL.createObjectURL(blob))
     } catch (e) {
       console.error("Local audio load failed", e)
     }
-  }
-
-  const getSupportedMimeType = () => {
-    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/wav'];
-    for (const type of types) {
-      if (typeof window !== "undefined" && MediaRecorder.isTypeSupported(type)) return type;
-    }
-    return '';
   }
 
   const startRecording = async () => {
@@ -65,16 +62,15 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mimeType = getSupportedMimeType();
+      const types = ['audio/webm', 'audio/mp4', 'audio/wav']
+      const mimeType = types.find(t => MediaRecorder.isTypeSupported(t))
 
-      // Set low bitrate to maximize storage space (32kbps is enough for speech)
       mediaRecorder.current = new MediaRecorder(stream, {
-        mimeType: mimeType || undefined,
+        mimeType: mimeType,
         audioBitsPerSecond: 32000
       })
 
       audioChunks.current = []
-
       mediaRecorder.current.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunks.current.push(event.data)
       }
@@ -89,7 +85,7 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
         setIsUploading(true)
         try {
           const supabase = createClient()
-          const ext = mimeType.includes('mp4') ? 'mp4' : 'webm'
+          const ext = mimeType?.includes('mp4') ? 'mp4' : 'webm'
           const fileName = `${localId}.${ext}`
 
           const { data, error } = await supabase.storage
@@ -105,6 +101,7 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
           setAudioUrl(publicUrl)
           onAudioSaved(localId, publicUrl)
         } catch (err) {
+          console.error("Sync failed", err)
           setAudioUrl(URL.createObjectURL(audioBlob))
           onAudioSaved(localId)
         } finally {
@@ -114,14 +111,14 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
 
       mediaRecorder.current.start()
       setIsRecording(true)
-      setTimeLeft(30)
+      setTimeLeft(20)
 
       timerInterval.current = setInterval(() => {
         setTimeLeft((prev) => prev - 1)
       }, 1000)
 
     } catch (err) {
-      alert("Microphone Access Denied! Please tap the lock icon in your browser's URL bar and 'Allow' microphone permissions.")
+      alert("Microphone Access Denied! Please check permissions.")
     }
   }
 
@@ -136,11 +133,8 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
 
   const togglePlay = () => {
     if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause()
-      } else {
-        audioRef.current.play().catch(() => setIsPlaying(false))
-      }
+      if (isPlaying) audioRef.current.pause()
+      else audioRef.current.play().catch(() => setIsPlaying(false))
       setIsPlaying(!isPlaying)
     }
   }
@@ -173,7 +167,7 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
             type="button"
             onClick={isRecording ? stopRecording : startRecording}
             className={cn(
-              "flex items-center justify-center w-12 h-12 rounded-full transition-all shadow-xl active:scale-95",
+              "flex items-center justify-center w-12 h-12 rounded-full transition-all shadow-lg active:scale-90",
               isRecording ? "bg-danger animate-pulse ring-4 ring-danger/10" : "bg-white text-black hover:bg-neutral-200"
             )}
           >
@@ -183,9 +177,9 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
           <button
             type="button"
             onClick={togglePlay}
-            className="flex items-center justify-center w-12 h-12 rounded-full bg-white text-black hover:bg-neutral-200 transition-all shadow-xl active:scale-95"
+            className="flex items-center justify-center w-12 h-12 rounded-full bg-white text-black hover:bg-neutral-200 transition-all shadow-lg active:scale-90"
           >
-            {isPlaying ? <Pause className="w-5 h-5 fill-black" /> : <Play className="w-5 h-5 fill-black ml-1" />}
+            {isPlaying ? <Pause className="w-5 h-5 fill-black" /> : <Play className="w-5 h-5 fill-black ml-0.5" />}
           </button>
         )}
 
@@ -193,21 +187,20 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
           {isRecording ? (
             <div className="flex flex-col">
               <div className="text-[11px] font-black uppercase text-danger animate-pulse tracking-widest">Recording...</div>
-              <div className="flex items-center gap-1.5 text-white mt-0.5">
-                <Timer className="w-3 h-3 text-danger" />
-                <span className="text-xs font-mono font-bold">00:{timeLeft.toString().padStart(2, '0')}</span>
+              <div className="flex items-center gap-1.5 text-white font-mono text-xs">
+                <Timer className="w-3 h-3 text-danger" /> 00:{timeLeft.toString().padStart(2, '0')}
               </div>
             </div>
           ) : isUploading ? (
-            <div className="text-[11px] font-black uppercase text-primary animate-pulse tracking-widest">Syncing Cloud...</div>
+            <div className="text-[10px] font-black uppercase text-primary animate-pulse tracking-widest">Securing Cloud...</div>
           ) : audioUrl ? (
             <div className="text-[10px] font-black uppercase text-success tracking-widest flex items-center gap-2 bg-success/5 border border-success/10 px-2 py-1 rounded w-fit">
-              <UploadCloud className="w-3.5 h-3.5" /> Data Secured
+              <UploadCloud className="w-4 h-4" /> Sync Secured
             </div>
           ) : (
-            <div className="text-[10px] font-black uppercase text-neutral-500 tracking-widest leading-tight">
-              30s Limit <br/>
-              <span className="text-[8px] opacity-40 uppercase">Tap mic to record</span>
+            <div className="text-[10px] font-black uppercase text-neutral-500 tracking-widest leading-tight italic">
+              20s Max <br/>
+              <span className="text-[8px] opacity-40 uppercase">Tap mic to start</span>
             </div>
           )}
         </div>
