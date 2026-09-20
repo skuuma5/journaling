@@ -92,8 +92,8 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile Header/Toggle */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-[60] flex items-center justify-between px-4">
+      {/* Mobile Header - Changed to sticky to avoid overlapping content */}
+      <div className="lg:hidden sticky top-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md border-b border-border z-[60] flex items-center justify-between px-4">
         <Link href="/" onClick={closeSidebar} className="text-lg font-black tracking-tighter text-white flex items-center gap-2">
           <Activity className="w-5 h-5 text-white" />
           JOURNALING

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Mic, Square, Play, Trash2, Pause, Loader2, Cloud, UploadCloud } from "lucide-react"
+import { Mic, Square, Play, Trash2, Pause, Loader2, Cloud, UploadCloud, Timer } from "lucide-react"
 import { saveAudio, getAudio, deleteAudio } from "@/lib/audio-storage"
 import { createClient } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
@@ -19,10 +19,13 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
   const [audioUrl, setAudioUrl] = useState<string | null>(initialAudioUrl || null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(30)
   const [audioId, setAudioId] = useState<string | null>(initialAudioId || null)
+
   const mediaRecorder = useRef<MediaRecorder | null>(null)
   const audioChunks = useRef<Blob[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const timerInterval = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -30,6 +33,13 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
       loadLocalAudio(initialAudioId)
     }
   }, [initialAudioId, initialAudioUrl])
+
+  // Stop recording automatically at 30 seconds
+  useEffect(() => {
+    if (isRecording && timeLeft <= 0) {
+      stopRecording()
+    }
+  }, [timeLeft, isRecording])
 
   async function loadLocalAudio(id: string) {
     try {
@@ -43,24 +53,26 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
   }
 
   const getSupportedMimeType = () => {
-    const types = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav'];
+    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/wav'];
     for (const type of types) {
-      if (MediaRecorder.isTypeSupported(type)) return type;
+      if (typeof window !== "undefined" && MediaRecorder.isTypeSupported(type)) return type;
     }
     return '';
   }
 
   const startRecording = async () => {
-    if (typeof window === "undefined" || !navigator.mediaDevices) {
-      alert("Recording not supported on this browser.")
-      return
-    }
+    if (typeof window === "undefined" || !navigator.mediaDevices) return
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mimeType = getSupportedMimeType();
 
-      mediaRecorder.current = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+      // Set low bitrate to maximize storage space (32kbps is enough for speech)
+      mediaRecorder.current = new MediaRecorder(stream, {
+        mimeType: mimeType || undefined,
+        audioBitsPerSecond: 32000
+      })
+
       audioChunks.current = []
 
       mediaRecorder.current.ondataavailable = (event) => {
@@ -77,7 +89,6 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
         setIsUploading(true)
         try {
           const supabase = createClient()
-          // Use correct extension based on mimeType
           const ext = mimeType.includes('mp4') ? 'mp4' : 'webm'
           const fileName = `${localId}.${ext}`
 
@@ -94,7 +105,6 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
           setAudioUrl(publicUrl)
           onAudioSaved(localId, publicUrl)
         } catch (err) {
-          console.error("Cloud sync failed", err)
           setAudioUrl(URL.createObjectURL(audioBlob))
           onAudioSaved(localId)
         } finally {
@@ -104,8 +114,14 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
 
       mediaRecorder.current.start()
       setIsRecording(true)
+      setTimeLeft(30)
+
+      timerInterval.current = setInterval(() => {
+        setTimeLeft((prev) => prev - 1)
+      }, 1000)
+
     } catch (err) {
-      alert("Microphone access denied. Please enable microphone permissions in your settings.")
+      alert("Microphone Access Denied! Please tap the lock icon in your browser's URL bar and 'Allow' microphone permissions.")
     }
   }
 
@@ -113,6 +129,7 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
     if (mediaRecorder.current && isRecording) {
       mediaRecorder.current.stop()
       setIsRecording(false)
+      if (timerInterval.current) clearInterval(timerInterval.current)
       mediaRecorder.current.stream.getTracks().forEach(track => track.stop())
     }
   }
@@ -138,12 +155,12 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
   if (!mounted) return <div className="h-24 bg-neutral-900 border border-border rounded-lg animate-pulse" />
 
   return (
-    <div className="flex flex-col gap-3 p-4 bg-neutral-900 border border-border rounded-lg">
+    <div className="flex flex-col gap-3 p-4 bg-neutral-900/50 border border-border rounded-lg shadow-inner">
       <div className="flex items-center justify-between">
         <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-          Audio Journal {isUploading && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
+          Voice Analysis {isUploading && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
         </label>
-        {audioUrl && (
+        {audioUrl && !isRecording && (
           <button type="button" onClick={handleDelete} className="text-danger hover:text-danger/80 transition-colors p-1">
             <Trash2 className="w-4 h-4" />
           </button>
@@ -151,38 +168,47 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
       </div>
 
       <div className="flex items-center gap-4">
-        {!audioUrl ? (
+        {!audioUrl || isRecording ? (
           <button
             type="button"
             onClick={isRecording ? stopRecording : startRecording}
             className={cn(
-              "flex items-center justify-center w-14 h-14 rounded-full transition-all shadow-xl active:scale-90",
-              isRecording ? "bg-danger animate-pulse" : "bg-white text-black hover:bg-neutral-200"
+              "flex items-center justify-center w-12 h-12 rounded-full transition-all shadow-xl active:scale-95",
+              isRecording ? "bg-danger animate-pulse ring-4 ring-danger/10" : "bg-white text-black hover:bg-neutral-200"
             )}
           >
-            {isRecording ? <Square className="w-6 h-6 fill-white" /> : <Mic className="w-6 h-6" />}
+            {isRecording ? <Square className="w-5 h-5 fill-white" /> : <Mic className="w-5 h-5" />}
           </button>
         ) : (
           <button
             type="button"
             onClick={togglePlay}
-            className="flex items-center justify-center w-14 h-14 rounded-full bg-white text-black hover:bg-neutral-200 transition-all shadow-xl active:scale-90"
+            className="flex items-center justify-center w-12 h-12 rounded-full bg-white text-black hover:bg-neutral-200 transition-all shadow-xl active:scale-95"
           >
-            {isPlaying ? <Pause className="w-6 h-6 fill-black" /> : <Play className="w-6 h-6 fill-black ml-1" />}
+            {isPlaying ? <Pause className="w-5 h-5 fill-black" /> : <Play className="w-5 h-5 fill-black ml-1" />}
           </button>
         )}
 
         <div className="flex-1">
           {isRecording ? (
-            <div className="text-[11px] font-black uppercase text-danger animate-pulse tracking-widest">Recording...</div>
+            <div className="flex flex-col">
+              <div className="text-[11px] font-black uppercase text-danger animate-pulse tracking-widest">Recording...</div>
+              <div className="flex items-center gap-1.5 text-white mt-0.5">
+                <Timer className="w-3 h-3 text-danger" />
+                <span className="text-xs font-mono font-bold">00:{timeLeft.toString().padStart(2, '0')}</span>
+              </div>
+            </div>
           ) : isUploading ? (
-            <div className="text-[11px] font-black uppercase text-primary animate-pulse tracking-widest">Syncing to Cloud...</div>
+            <div className="text-[11px] font-black uppercase text-primary animate-pulse tracking-widest">Syncing Cloud...</div>
           ) : audioUrl ? (
-            <div className="text-[11px] font-black uppercase text-success tracking-widest flex items-center gap-2">
-              <UploadCloud className="w-4 h-4" /> Memo Secured
+            <div className="text-[10px] font-black uppercase text-success tracking-widest flex items-center gap-2 bg-success/5 border border-success/10 px-2 py-1 rounded w-fit">
+              <UploadCloud className="w-3.5 h-3.5" /> Data Secured
             </div>
           ) : (
-            <div className="text-[10px] font-black uppercase text-neutral-500 tracking-widest italic leading-tight">Tap icon to record voice analysis</div>
+            <div className="text-[10px] font-black uppercase text-neutral-500 tracking-widest leading-tight">
+              30s Limit <br/>
+              <span className="text-[8px] opacity-40 uppercase">Tap mic to record</span>
+            </div>
           )}
         </div>
       </div>

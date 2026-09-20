@@ -22,8 +22,8 @@ export function SidebarWrapper({ children }: { children: React.ReactNode }) {
       {!isAuthPage && <Sidebar />}
       <main className={cn(
         "flex-1 min-h-screen transition-all duration-300 w-full",
-        // Desktop has margin, mobile starts at 0 with top padding for the mobile header
-        !isAuthPage ? "lg:ml-64 pt-20 lg:pt-8 p-4 md:p-8" : "ml-0 p-4 md:p-8"
+        // pt-32 on mobile (lg:pt-8) to give enough space below the fixed header
+        !isAuthPage ? "lg:ml-64 pt-32 lg:pt-8 p-4 md:p-8" : "ml-0 p-4 md:p-8"
       )}>
         <div className="max-w-[1400px] mx-auto overflow-x-hidden">
           {children}
