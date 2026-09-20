@@ -119,15 +119,19 @@ export async function PATCH(
       accountBalance: oldTrade.account.currentBalance - (oldTrade.pnl || 0)
     })
 
-    const finalPnl = pnl !== null && pnl !== undefined && pnl !== "" ? parseFloat(pnl) : metrics.pnl
-    const finalActualR = actualR !== null && actualR !== undefined && actualR !== "" ? parseFloat(actualR) : metrics.actualR
+    let finalPnl = pnl !== null && pnl !== undefined && pnl !== "" ? parseFloat(pnl) : metrics.pnl
+    let finalResult = result || (finalPnl > 0 ? "WIN" : finalPnl < 0 ? "LOSS" : "BREAKEVEN")
 
-    let finalResult = result || "BREAKEVEN"
-    if (!result) {
-      if (finalPnl > 0) finalResult = "WIN"
-      else if (finalPnl < 0) finalResult = "LOSS"
+    // Force sign based on the selected result
+    if (finalResult === "LOSS" && finalPnl > 0) {
+      finalPnl = -Math.abs(finalPnl)
+    } else if (finalResult === "WIN" && finalPnl < 0) {
+      finalPnl = Math.abs(finalPnl)
+    } else if (finalResult === "BREAKEVEN") {
+      finalPnl = 0
     }
 
+    const finalActualR = (actualR !== null && actualR !== undefined && actualR !== "" ? parseFloat(actualR) : metrics.actualR)
     const tradeDate = new Date(`${date}T${time}`)
 
     const updatedTrade = await prisma.$transaction(async (tx) => {

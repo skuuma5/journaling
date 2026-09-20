@@ -4,14 +4,13 @@ import { useEffect, useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  AreaChart, Area, PieChart, Pie, Cell
+  AreaChart, Area, PieChart, Pie, Cell, Legend
 } from 'recharts'
 import { StatCard } from "@/components/StatCard"
-import { BarChart3, TrendingUp, Calendar, Target, Activity, Loader2, Filter } from "lucide-react"
+import { BarChart3, TrendingUp, Calendar, Target, Activity, Loader2, Filter, Clock, Globe } from "lucide-react"
 
-const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b', '#8b5cf6', '#ec4899']
+const COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6']
 
-// Component li kiy-khdem b-useSearchParams
 function AnalyticsUI() {
   const searchParams = useSearchParams()
   const [selectedAccountId, setSelectedAccountId] = useState(searchParams.get('accountId') || "all")
@@ -67,7 +66,7 @@ function AnalyticsUI() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Terminal Analytics</h2>
-          <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest">Deep execution audit & edge analysis.</p>
+          <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest">Deep execution audit & session analysis.</p>
         </div>
 
         <div className="relative w-full md:w-64">
@@ -97,10 +96,11 @@ function AnalyticsUI() {
             <StatCard label="Accuracy" value={`${data.winRate.toFixed(1)}%`} subValue="Verified" trend={data.winRate >= 60 ? "up" : "neutral"} />
             <StatCard label="Total Vol" value={data.totalTrades} subValue="Executions" trend="neutral" />
             <StatCard label="Profit Factor" value={data.profitFactor?.toFixed(2) || "0.00"} subValue="Edge Index" trend={data.profitFactor >= 1.5 ? "up" : "neutral"} />
-            <StatCard label="Equity Status" value="Active" subValue="Risk Managed" trend="up" />
+            <StatCard label="Best Session" value={data.sessionStats.sort((a: any, b: any) => b.pnl - a.pnl)[0]?.name || "N/A"} subValue="By Profitability" trend="up" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Equity Curve */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <TrendingUp className="w-4 h-4 text-success" />
@@ -117,7 +117,7 @@ function AnalyticsUI() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#171717" vertical={false} />
                     <XAxis dataKey="date" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} dy={10} />
-                    <YAxis stroke="#525252" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
+                    <YAxis stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', fontSize: '12px' }}
                     />
@@ -127,10 +127,39 @@ function AnalyticsUI() {
               </div>
             </div>
 
+            {/* Session Stats Chart */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
-                <Calendar className="w-4 h-4 text-blue-500" />
-                Session Performance
+                <Globe className="w-4 h-4 text-blue-500" />
+                Trading Sessions (Asia, London, NY)
+              </h3>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.sessionStats}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#171717" vertical={false} />
+                    <XAxis dataKey="name" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} dy={10} />
+                    <YAxis yAxisId="left" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis yAxisId="right" orientation="right" stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', fontSize: '12px' }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }} />
+                    <Bar yAxisId="left" dataKey="pnl" name="Net P&L" radius={[2, 2, 0, 0]}>
+                      {data.sessionStats.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />
+                      ))}
+                    </Bar>
+                    <Bar yAxisId="right" dataKey="count" name="Trade Vol" fill="#6366f1" radius={[2, 2, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Weekly Performance */}
+            <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
+              <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
+                <Calendar className="w-4 h-4 text-primary" />
+                Weekly Performance Breakdown
               </h3>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -151,10 +180,11 @@ function AnalyticsUI() {
               </div>
             </div>
 
+            {/* Probability Distribution */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Activity className="w-4 h-4 text-purple-500" />
-                Probability Distribution
+                Execution Probability
               </h3>
               <div className="h-[300px] flex items-center justify-center relative">
                 <ResponsiveContainer width="100%" height="100%">
@@ -184,7 +214,10 @@ function AnalyticsUI() {
                 </div>
               </div>
             </div>
+          </div>
 
+          {/* Model Efficiency & Behavioral Audit */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-card border border-border rounded-xl p-6 shadow-2xl relative overflow-hidden">
               <h3 className="font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-2 text-neutral-400">
                 <Target className="w-4 h-4 text-yellow-500" />
@@ -206,46 +239,40 @@ function AnalyticsUI() {
                 </ResponsiveContainer>
               </div>
             </div>
-          </div>
 
-          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-2xl">
-            <div className="p-6 border-b border-border bg-neutral-900/20">
-              <h3 className="font-black text-xs uppercase tracking-[0.3em] flex items-center gap-2 text-neutral-400">
-                <BarChart3 className="w-4 h-4 text-danger" />
-                Behavioral Audit (Leakage)
-              </h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground border-b border-border bg-neutral-900/10">
-                    <th className="px-6 py-4 font-black">Process Error</th>
-                    <th className="px-6 py-4 font-black text-center">Frequency</th>
-                    <th className="px-6 py-4 text-right font-black">Financial Impact</th>
-                    <th className="px-6 py-4 text-right font-black">Relative Weight</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {data.byMistake.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-10 text-center text-xs text-muted-foreground italic uppercase tracking-widest font-black opacity-30">Zero behavioral breaches detected. Process integrity optimal.</td>
+            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-2xl">
+              <div className="p-6 border-b border-border bg-neutral-900/20">
+                <h3 className="font-black text-xs uppercase tracking-[0.3em] flex items-center gap-2 text-neutral-400">
+                  <BarChart3 className="w-4 h-4 text-danger" />
+                  Behavioral Audit (Leakage)
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground border-b border-border bg-neutral-900/10">
+                      <th className="px-6 py-4 font-black">Process Error</th>
+                      <th className="px-6 py-4 font-black text-center">Frequency</th>
+                      <th className="px-6 py-4 text-right font-black">Financial Impact</th>
                     </tr>
-                  ) : (
-                    data.byMistake.map((m: any) => (
-                      <tr key={m.name} className="group hover:bg-neutral-900/30 transition-all">
-                        <td className="px-6 py-4 font-black text-white text-sm uppercase tracking-tight">{m.name}</td>
-                        <td className="px-6 py-4 text-xs text-neutral-400 text-center font-bold uppercase">{m.count} Executions</td>
-                        <td className="px-6 py-4 text-right font-black text-danger text-sm tabular-nums">-${Math.abs(m.loss).toFixed(2)}</td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="w-32 bg-neutral-800 rounded-full h-1 ml-auto overflow-hidden">
-                            <div className="bg-danger h-full" style={{ width: `${Math.min(100, (Math.abs(m.loss) / Math.abs(data.byMistake[0].loss)) * 100)}%` }} />
-                          </div>
-                        </td>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {data.byMistake.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-10 text-center text-xs text-muted-foreground italic uppercase tracking-widest font-black opacity-30">Zero behavioral breaches detected.</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      data.byMistake.map((m: any) => (
+                        <tr key={m.name} className="group hover:bg-neutral-900/30 transition-all">
+                          <td className="px-6 py-4 font-black text-white text-sm uppercase tracking-tight">{m.name}</td>
+                          <td className="px-6 py-4 text-xs text-neutral-400 text-center font-bold uppercase">{m.count} Executions</td>
+                          <td className="px-6 py-4 text-right font-black text-danger text-sm tabular-nums">-${Math.abs(m.loss).toFixed(2)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </>
@@ -254,7 +281,6 @@ function AnalyticsUI() {
   )
 }
 
-// Wrapper f-nefs l-file bach n-avoidiw l-hydration error
 export default function AnalyticsClient() {
   return (
     <Suspense fallback={

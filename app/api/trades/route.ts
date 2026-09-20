@@ -60,17 +60,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Account ID is required" }, { status: 400 })
     }
 
-    // Ensure user exists in Prisma (for mock/local dev)
-    await prisma.user.upsert({
-      where: { id: user.id },
-      update: {},
-      create: {
-        id: user.id,
-        email: user.email || 'dev@local.com',
-        name: 'Trader',
-      }
-    })
-
     const account = await prisma.account.findUnique({
       where: { id: accountId, userId: user.id }
     })
@@ -87,15 +76,15 @@ export async function POST(req: Request) {
       accountBalance: account.currentBalance
     })
 
-    const finalPnl = (pnl !== null && pnl !== undefined) ? parseFloat(pnl) : metrics.pnl
+    // Force P&L sign based on result
+    let finalPnl = (pnl !== null && pnl !== undefined) ? parseFloat(pnl) : metrics.pnl
+    let finalResult = result || (finalPnl > 0 ? "WIN" : finalPnl < 0 ? "LOSS" : "BREAKEVEN")
+
+    if (finalResult === "LOSS" && finalPnl > 0) finalPnl = -Math.abs(finalPnl)
+    if (finalResult === "WIN" && finalPnl < 0) finalPnl = Math.abs(finalPnl)
+    if (finalResult === "BREAKEVEN") finalPnl = 0
+
     const finalActualR = (actualR !== null && actualR !== undefined) ? parseFloat(actualR) : metrics.actualR
-
-    let finalResult = result || "BREAKEVEN"
-    if (!result) {
-      if (finalPnl > 0) finalResult = "WIN"
-      else if (finalPnl < 0) finalResult = "LOSS"
-    }
-
     const tradeDate = new Date(`${date}T${time}`)
 
     const trade = await prisma.$transaction(async (tx) => {
@@ -124,7 +113,7 @@ export async function POST(req: Request) {
           rewardToRisk: metrics.rewardToRisk,
           status: "CLOSED",
           audioId,
-          audioUrl, // Now saving the Cloud URL
+          audioUrl,
           mistakes: {
             connectOrCreate: (mistakes || []).map((m: string) => ({
               where: { name_userId: { name: m, userId: user.id } },

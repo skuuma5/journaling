@@ -10,6 +10,7 @@ import AudioRecorder from "@/components/AudioRecorder"
 export default function EditTradePage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [isAudioSyncing, setIsAudioSyncing] = useState(false)
   const [fetching, setFetching] = useState(true)
   const [strategies, setStrategies] = useState<any[]>([])
   const [audioData, setAudioData] = useState<{id: string | null, url: string | null}>({ id: null, url: null })
@@ -55,7 +56,8 @@ export default function EditTradePage({ params }: { params: { id: string } }) {
           stopLoss: trade.stopLoss?.toString() || "",
           takeProfit: trade.takeProfit?.toString() || "",
           lotSize: trade.lotSize.toString(),
-          pnl: trade.pnl?.toString() || "",
+          // Store absolute value locally for easier editing, sign handled by result
+          pnl: Math.abs(trade.pnl || 0).toString(),
           actualR: trade.actualR?.toString() || "",
           date: tradeDate.toISOString().split('T')[0],
           time: tradeDate.toTimeString().split(' ')[0].slice(0, 5),
@@ -77,6 +79,8 @@ export default function EditTradePage({ params }: { params: { id: string } }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isAudioSyncing) return
+
     setLoading(true)
 
     try {
@@ -115,9 +119,9 @@ export default function EditTradePage({ params }: { params: { id: string } }) {
     </div>
   )
 
-  const pnlValue = parseFloat(formData.pnl)
-  const isNegative = pnlValue < 0 || formData.result === "LOSS"
-  const isPositive = pnlValue > 0 || formData.result === "WIN"
+  // Determine styling based on selected result
+  const isLossResult = formData.result === "LOSS"
+  const isWinResult = formData.result === "WIN"
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-20 animate-in fade-in duration-500">
@@ -133,11 +137,11 @@ export default function EditTradePage({ params }: { params: { id: string } }) {
         </div>
         <button
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={loading || isAudioSyncing}
           className="flex items-center gap-2 bg-white text-black px-6 py-2.5 rounded-md text-xs font-black uppercase tracking-widest hover:bg-neutral-200 transition-all active:scale-95 disabled:opacity-50"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : <Save className="w-4 h-4" />}
-          Update Trade
+          {loading ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : isAudioSyncing ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : <Save className="w-4 h-4" />}
+          {isAudioSyncing ? "Syncing..." : "Update Trade"}
         </button>
       </div>
 
@@ -170,20 +174,23 @@ export default function EditTradePage({ params }: { params: { id: string } }) {
               </div>
 
               <div className="space-y-2">
-                <label className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", isNegative ? "text-danger" : isPositive ? "text-success" : "text-muted-foreground")}>Net P&L ($)</label>
-                <input
-                  type="number"
-                  step="any"
-                  name="pnl"
-                  value={formData.pnl}
-                  onChange={handleChange}
-                  className={cn(
-                    "w-full bg-neutral-900 border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 transition-all font-black tabular-nums",
-                    isNegative ? "border-danger text-danger focus:ring-danger" :
-                    isPositive ? "border-success text-success focus:ring-success" :
-                    "border-border text-white focus:ring-white/20"
-                  )}
-                />
+                <label className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", isLossResult ? "text-danger" : isWinResult ? "text-success" : "text-muted-foreground")}>Net P&L ($)</label>
+                <div className="relative">
+                  {isLossResult && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-danger font-black text-sm">-</span>}
+                  <input
+                    type="number"
+                    step="any"
+                    name="pnl"
+                    value={formData.pnl}
+                    onChange={handleChange}
+                    className={cn(
+                      "w-full bg-neutral-900 border rounded-md py-2 text-sm outline-none focus:ring-1 transition-all font-black tabular-nums",
+                      isLossResult ? "border-danger text-danger focus:ring-danger pl-6" :
+                      isWinResult ? "border-success text-success focus:ring-success px-3" :
+                      "border-border text-white focus:ring-white/20 px-3"
+                    )}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -271,6 +278,7 @@ export default function EditTradePage({ params }: { params: { id: string } }) {
               initialAudioId={audioData.id || undefined}
               initialAudioUrl={audioData.url || undefined}
               onAudioSaved={(id, url) => setAudioData({ id, url: url || null })}
+              onUploadingStateChange={(uploading) => setIsAudioSyncing(uploading)}
               onDelete={() => setAudioData({ id: null, url: null })}
             />
           </div>

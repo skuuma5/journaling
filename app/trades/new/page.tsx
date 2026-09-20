@@ -10,6 +10,7 @@ import AudioRecorder from "@/components/AudioRecorder"
 export default function NewTradePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [isAudioSyncing, setIsAudioSyncing] = useState(false)
   const [accounts, setAccounts] = useState<any[]>([])
   const [strategies, setStrategies] = useState<any[]>([])
 
@@ -74,6 +75,8 @@ export default function NewTradePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isAudioSyncing) return // Safety check
+
     setLoading(true)
 
     try {
@@ -93,7 +96,7 @@ export default function NewTradePage() {
           tags: tags,
           imageUrl: imagePreview,
           audioId: audioData.id,
-          audioUrl: audioData.url, // Save the cloud link
+          audioUrl: audioData.url,
           result: formData.result
         }),
       })
@@ -119,7 +122,7 @@ export default function NewTradePage() {
     <div className="max-w-6xl mx-auto space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Link href="/trades" className="p-2 hover:bg-secondary rounded-full transition-colors text-white">
+          <Link href="/trades" className="p-2 hover:bg-neutral-900 rounded-full transition-colors text-white border border-transparent hover:border-border">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
@@ -129,11 +132,11 @@ export default function NewTradePage() {
         </div>
         <button
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={loading || isAudioSyncing}
           className="flex items-center gap-2 bg-white text-black px-6 py-2.5 rounded-md text-xs font-black uppercase tracking-widest hover:bg-neutral-200 transition-all active:scale-95 disabled:opacity-50"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : <Save className="w-4 h-4" />}
-          Commit Trade
+          {loading ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : isAudioSyncing ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : <Save className="w-4 h-4" />}
+          {isAudioSyncing ? "Syncing Audio..." : "Commit Trade"}
         </button>
       </div>
 
@@ -166,28 +169,31 @@ export default function NewTradePage() {
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Manual Result</label>
                 <div className="grid grid-cols-3 gap-1">
-                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, result: "WIN" }))} className={cn("py-2 text-[9px] font-black rounded border transition-all uppercase", formData.result === "WIN" ? "bg-success border-success text-white shadow-[0_0_10px_rgba(16,185,129,0.2)]" : "bg-neutral-900 border-border text-neutral-500")}>WIN</button>
-                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, result: "LOSS" }))} className={cn("py-2 text-[9px] font-black rounded border transition-all uppercase", formData.result === "LOSS" ? "bg-danger border-danger text-white shadow-[0_0_10px_rgba(239,68,68,0.2)]" : "bg-neutral-900 border-border text-neutral-500")}>LOSS</button>
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, result: "WIN" }))} className={cn("py-2 text-[9px] font-black rounded border transition-all uppercase", formData.result === "WIN" ? "bg-success border-success text-white" : "bg-neutral-900 border-border text-neutral-500")}>WIN</button>
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, result: "LOSS" }))} className={cn("py-2 text-[9px] font-black rounded border transition-all uppercase", formData.result === "LOSS" ? "bg-danger border-danger text-white" : "bg-neutral-900 border-border text-neutral-500")}>LOSS</button>
                   <button type="button" onClick={() => setFormData(prev => ({ ...prev, result: "BREAKEVEN" }))} className={cn("py-2 text-[9px] font-black rounded border transition-all uppercase", formData.result === "BREAKEVEN" ? "bg-neutral-700 border-neutral-600 text-white" : "bg-neutral-900 border-border text-neutral-500")}>BE</button>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", isNegative ? "text-danger" : isPositive ? "text-success" : "text-muted-foreground")}>Net P&L ($)</label>
-                <input
-                  type="number"
-                  step="any"
-                  name="pnl"
-                  value={formData.pnl}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                  className={cn(
-                    "w-full bg-neutral-900 border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 transition-all font-black tabular-nums",
-                    isNegative ? "border-danger text-danger focus:ring-danger shadow-[0_0_10px_rgba(239,68,68,0.1)]" :
-                    isPositive ? "border-success text-success focus:ring-success shadow-[0_0_10px_rgba(16,185,129,0.1)]" :
-                    "border-border text-white focus:ring-white/20"
-                  )}
-                />
+                <div className="relative">
+                  {isNegative && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-danger font-black text-sm">-</span>}
+                  <input
+                    type="number"
+                    step="any"
+                    name="pnl"
+                    value={formData.pnl}
+                    onChange={handleChange}
+                    placeholder="0.00"
+                    className={cn(
+                      "w-full bg-neutral-900 border rounded-md py-2 text-sm outline-none focus:ring-1 transition-all font-black tabular-nums",
+                      isNegative ? "border-danger text-danger focus:ring-danger pl-6" :
+                      isPositive ? "border-success text-success focus:ring-success px-3" :
+                      "border-border text-white focus:ring-white/20 px-3"
+                    )}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -279,7 +285,11 @@ export default function NewTradePage() {
               {imagePreview && <button type="button" onClick={() => setImagePreview(null)} className="absolute top-2 right-2 p-1 bg-black/60 rounded-full text-white hover:bg-danger z-20 transition-colors"> <X className="w-3 h-3" /> </button>}
             </div>
 
-            <AudioRecorder onAudioSaved={(id, url) => setAudioData({ id, url })} onDelete={() => setAudioData({ id: null, url: null })} />
+            <AudioRecorder
+              onAudioSaved={(id, url) => setAudioData({ id, url: url || null })}
+              onUploadingStateChange={(uploading) => setIsAudioSyncing(uploading)}
+              onDelete={() => setAudioData({ id: null, url: null })}
+            />
           </div>
         </div>
       </div>

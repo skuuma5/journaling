@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ isEmpty: true })
     }
 
-    // 1. Starting Balance for Equity Curve
+    // 1. Starting Balance
     let startingBalance = 0
     if (accountId && accountId !== 'all') {
       const acc = await prisma.account.findUnique({ where: { id: accountId } })
@@ -49,13 +49,16 @@ export async function GET(req: Request) {
 
     // 2. Data Aggregators
     const symbolData: Record<string, number> = {}
-    const sessionData: Record<string, number> = { 'ASIA': 0, 'LONDON': 0, 'NY': 0 }
+    const sessionData: Record<string, { pnl: number, count: number }> = {
+      'ASIA': { pnl: 0, count: 0 },
+      'LONDON': { pnl: 0, count: 0 },
+      'NY': { pnl: 0, count: 0 }
+    }
     const hourData: Record<number, number> = {}
     const dayOfWeekData: Record<string, number> = { 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0 }
     const strategyData: Record<string, number> = {}
     const mistakeData: Record<string, { count: number, loss: number }> = {}
 
-    // Initialize hours
     for (let i = 0; i < 24; i++) hourData[i] = 0
 
     let runningBalance = startingBalance
@@ -63,37 +66,35 @@ export async function GET(req: Request) {
       const pnl = t.pnl || 0
       runningBalance += pnl
 
-      // Group by Symbol
       symbolData[t.symbol] = (symbolData[t.symbol] || 0) + pnl
 
-      // Group by Session
-      if (t.session) sessionData[t.session] = (sessionData[t.session] || 0) + pnl
+      if (t.session) {
+        const session = t.session.toUpperCase()
+        if (sessionData[session]) {
+          sessionData[session].pnl += pnl
+          sessionData[session].count += 1
+        } else {
+          sessionData[session] = { pnl, count: 1 }
+        }
+      }
 
-      // Group by Hour
       const hour = getHours(new Date(t.date))
       hourData[hour] += pnl
 
-      // Group by Day
       const day = format(new Date(t.date), 'eee')
       if (dayOfWeekData[day] !== undefined) dayOfWeekData[day] += pnl
 
-      // Group by Strategy
       const sName = t.strategy?.name || 'No Strategy'
       strategyData[sName] = (strategyData[sName] || 0) + pnl
 
-      // Group by Mistakes
       t.mistakes.forEach(m => {
         if (!mistakeData[m.name]) mistakeData[m.name] = { count: 0, loss: 0 }
-        mistakeImpact(mistakeData[m.name], pnl)
+        mistakeData[m.name].count++
+        if (pnl < 0) mistakeData[m.name].loss += pnl
       })
 
       return { date: format(new Date(t.date), 'MMM d'), balance: runningBalance }
     })
-
-    function mistakeImpact(obj: any, pnl: number) {
-      obj.count++
-      if (pnl < 0) obj.loss += pnl
-    }
 
     return NextResponse.json({
       equityCurve,
@@ -101,7 +102,7 @@ export async function GET(req: Request) {
       totalTrades: trades.length,
       pnlByDay: Object.entries(dayOfWeekData).map(([day, pnl]) => ({ day, pnl })),
       pnlBySymbol: Object.entries(symbolData).map(([name, pnl]) => ({ name, pnl })).sort((a, b) => b.pnl - a.pnl),
-      pnlBySession: Object.entries(sessionData).map(([name, pnl]) => ({ name, pnl })),
+      sessionStats: Object.entries(sessionData).map(([name, stats]) => ({ name, ...stats })),
       pnlByHour: Object.entries(hourData).map(([hour, pnl]) => ({ hour: `${hour}:00`, pnl })),
       byStrategy: Object.entries(strategyData).map(([name, pnl]) => ({ name, pnl })).sort((a, b) => b.pnl - a.pnl),
       byMistake: Object.entries(mistakeData).map(([name, data]) => ({ name, ...data })).sort((a, b) => a.loss - b.loss),
