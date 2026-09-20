@@ -1,4 +1,4 @@
-import dynamic from 'next/dynamic'
+import nextDynamic from 'next/dynamic'
 import { Suspense } from "react"
 import { Loader2 } from "lucide-react"
 
@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react"
 export const dynamic = 'force-dynamic';
 
 // Import l-Client Component m3a ssr: false (kat-7iyd l-mouchkil dyal useSearchParams f-l-build)
-const AnalyticsClient = dynamic(() => import('./AnalyticsClient'), {
+const AnalyticsClient = nextDynamic(() => import('./AnalyticsClient'), {
   ssr: false,
   loading: () => (
     <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
