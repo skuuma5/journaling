@@ -12,7 +12,7 @@ export default function EditTradePage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
   const [strategies, setStrategies] = useState<any[]>([])
-  const [audioId, setAudioId] = useState<string | null>(null)
+  const [audioData, setAudioData] = useState<{id: string | null, url: string | null}>({ id: null, url: null })
 
   const [formData, setFormData] = useState<any>({
     symbol: "",
@@ -60,7 +60,7 @@ export default function EditTradePage({ params }: { params: { id: string } }) {
           date: tradeDate.toISOString().split('T')[0],
           time: tradeDate.toTimeString().split(' ')[0].slice(0, 5),
         })
-        setAudioId(trade.audioId)
+        setAudioData({ id: trade.audioId, url: trade.audioUrl })
       } catch (error) {
         console.error(error)
       } finally {
@@ -92,7 +92,8 @@ export default function EditTradePage({ params }: { params: { id: string } }) {
           lotSize: parseFloat(formData.lotSize) || 0,
           pnl: formData.pnl ? parseFloat(formData.pnl) : null,
           actualR: formData.actualR ? parseFloat(formData.actualR) : null,
-          audioId: audioId
+          audioId: audioData.id,
+          audioUrl: audioData.url
         }),
       })
 
@@ -204,11 +205,11 @@ export default function EditTradePage({ params }: { params: { id: string } }) {
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-danger/80">Stop Loss (SL)</label>
-                <input type="number" step="any" name="stopLoss" value={formData.stopLoss} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-danger/50 text-white font-bold" />
+                <input type="number" step="any" name="stopLoss" value={formData.stopLoss} onChange={handleChange} placeholder="0.0000" className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-danger/50 text-white font-bold" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-success/80">Take Profit (TP)</label>
-                <input type="number" step="any" name="takeProfit" value={formData.takeProfit} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-success/50 text-white font-bold" />
+                <input type="number" step="any" name="takeProfit" value={formData.takeProfit} onChange={handleChange} placeholder="0.0000" className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-success/50 text-white font-bold" />
               </div>
             </div>
           </div>
@@ -267,9 +268,10 @@ export default function EditTradePage({ params }: { params: { id: string } }) {
               Audio Record
             </h3>
             <AudioRecorder
-              initialAudioId={audioId || undefined}
-              onAudioSaved={(id) => setAudioId(id)}
-              onDelete={() => setAudioId(null)}
+              initialAudioId={audioData.id || undefined}
+              initialAudioUrl={audioData.url || undefined}
+              onAudioSaved={(id, url) => setAudioData({ id, url: url || null })}
+              onDelete={() => setAudioData({ id: null, url: null })}
             />
           </div>
         </div>

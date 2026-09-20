@@ -1,32 +1,36 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Mic, Square, Play, Trash2, Pause, Loader2 } from "lucide-react"
+import { Mic, Square, Play, Trash2, Pause, Loader2, CloudUpload } from "lucide-react"
 import { saveAudio, getAudio, deleteAudio } from "@/lib/audio-storage"
+import { createClient } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 
 interface AudioRecorderProps {
-  onAudioSaved: (audioId: string) => void
+  onAudioSaved: (audioId: string, audioUrl?: string) => void
   initialAudioId?: string
+  initialAudioUrl?: string
   onDelete?: () => void
 }
 
-export default function AudioRecorder({ onAudioSaved, initialAudioId, onDelete }: AudioRecorderProps) {
+export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAudioUrl, onDelete }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [audioUrl, setAudioUrl] = useState<string | null>(initialAudioUrl || null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [audioId, setAudioId] = useState<string | null>(initialAudioId || null)
   const mediaRecorder = useRef<MediaRecorder | null>(null)
   const audioChunks = useRef<Blob[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const supabase = createClient()
 
   useEffect(() => {
-    if (initialAudioId) {
-      loadInitialAudio(initialAudioId)
+    if (initialAudioId && !initialAudioUrl) {
+      loadLocalAudio(initialAudioId)
     }
-  }, [initialAudioId])
+  }, [initialAudioId, initialAudioUrl])
 
-  async function loadInitialAudio(id: string) {
+  async function loadLocalAudio(id: string) {
     const blob = await getAudio(id)
     if (blob) {
       setAudioUrl(URL.createObjectURL(blob))
@@ -45,13 +49,35 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, onDelete }
 
       mediaRecorder.current.onstop = async () => {
         const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' })
-        const url = URL.createObjectURL(audioBlob)
-        setAudioUrl(url)
+        const localId = `audio-${Date.now()}`
 
-        const newId = `audio-${Date.now()}`
-        await saveAudio(newId, audioBlob)
-        setAudioId(newId)
-        onAudioSaved(newId)
+        // 1. Save locally for offline use
+        await saveAudio(localId, audioBlob)
+        setAudioId(localId)
+
+        // 2. Upload to Supabase for Cloud Sync
+        setIsUploading(true)
+        try {
+          const fileName = `${localId}.webm`
+          const { data, error } = await supabase.storage
+            .from('trade-audios')
+            .upload(fileName, audioBlob)
+
+          if (error) throw error
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('trade-audios')
+            .getPublicUrl(fileName)
+
+          setAudioUrl(publicUrl)
+          onAudioSaved(localId, publicUrl)
+        } catch (err) {
+          console.error("Cloud upload failed:", err)
+          setAudioUrl(URL.createObjectURL(audioBlob))
+          onAudioSaved(localId) // Still works locally
+        } finally {
+          setIsUploading(false)
+        }
       }
 
       mediaRecorder.current.start()
@@ -81,18 +107,18 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, onDelete }
   }
 
   const handleDelete = async () => {
-    if (audioId) {
-      await deleteAudio(audioId)
-      setAudioId(null)
-      setAudioUrl(null)
-      if (onDelete) onDelete()
-    }
+    if (audioId) await deleteAudio(audioId)
+    setAudioId(null)
+    setAudioUrl(null)
+    if (onDelete) onDelete()
   }
 
   return (
     <div className="flex flex-col gap-3 p-4 bg-neutral-900 border border-border rounded-lg">
       <div className="flex items-center justify-between">
-        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Audio Journal</label>
+        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+          Audio Journal {isUploading && <Loader2 className="w-3 h-3 animate-spin" />}
+        </label>
         {audioUrl && (
           <button onClick={handleDelete} className="text-danger hover:text-danger/80 transition-colors">
             <Trash2 className="w-4 h-4" />
@@ -124,9 +150,13 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, onDelete }
 
         <div className="flex-1">
           {isRecording ? (
-            <div className="text-[10px] font-black uppercase text-danger animate-pulse tracking-widest">Recording in progress...</div>
+            <div className="text-[10px] font-black uppercase text-danger animate-pulse tracking-widest">Recording...</div>
+          ) : isUploading ? (
+            <div className="text-[10px] font-black uppercase text-primary animate-pulse tracking-widest">Syncing to Cloud...</div>
           ) : audioUrl ? (
-            <div className="text-[10px] font-black uppercase text-success tracking-widest">Audio Memo Captured</div>
+            <div className="text-[10px] font-black uppercase text-success tracking-widest flex items-center gap-2">
+              <CloudUpload className="w-3 h-3" /> Memo Secured Online
+            </div>
           ) : (
             <div className="text-[10px] font-black uppercase text-neutral-500 tracking-widest">No audio recorded</div>
           )}

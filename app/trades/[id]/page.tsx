@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
-  Target,
   Shield,
   TrendingUp,
   Activity,
@@ -16,14 +15,14 @@ import {
   Edit2,
   BrainCircuit,
   Smile,
-  Hash,
   Layers,
   ImageIcon,
   X,
   Loader2,
   Play,
   Pause,
-  Volume2
+  Volume2,
+  Cloud
 } from "lucide-react"
 import Link from "next/link"
 import { notFound, useRouter } from "next/navigation"
@@ -36,6 +35,7 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
   const [isZoomed, setIsZoomed] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isCloudAudio, setIsCloudAudio] = useState(false)
   const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null)
 
   useEffect(() => {
@@ -46,11 +46,22 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
         const data = await res.json()
         setTrade(data)
 
+        // Logic bach y-sync-i l-audio f-ga3 l-ajhiza
         if (data.audioId) {
-          const blob = await getAudio(data.audioId)
-          if (blob) {
-            setAudioUrl(URL.createObjectURL(blob))
+          const localBlob = await getAudio(data.audioId)
+          if (localBlob) {
+            // Khddam men l-PC (Local)
+            setAudioUrl(URL.createObjectURL(localBlob))
+            setIsCloudAudio(false)
+          } else if (data.audioUrl) {
+            // Khddam men Tilihone (Cloud Fallback)
+            setAudioUrl(data.audioUrl)
+            setIsCloudAudio(true)
           }
+        } else if (data.audioUrl) {
+          // Ghi l-link dyal cloud li kain
+          setAudioUrl(data.audioUrl)
+          setIsCloudAudio(true)
         }
       } catch (e) {
         console.error("Fetch error:", e)
@@ -207,8 +218,9 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
 
           {audioUrl && (
             <div className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-2xl">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 flex items-center gap-2">
-                <Volume2 className="w-3.5 h-3.5" /> Audio Journal
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 flex items-center justify-between">
+                <span className="flex items-center gap-2"><Volume2 className="w-3.5 h-3.5" /> Audio Journal</span>
+                {isCloudAudio && <Cloud className="w-3 h-3 text-primary opacity-50" />}
               </h3>
               <div className="flex items-center gap-4">
                 <button
@@ -224,7 +236,9 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
                       style={{ width: isPlaying ? '100%' : '0%', transition: isPlaying ? 'width 10s linear' : 'none' }}
                     />
                   </div>
-                  <div className="text-[8px] font-black uppercase text-neutral-500 mt-2 tracking-widest">Voice Memo Captured</div>
+                  <div className="text-[8px] font-black uppercase text-neutral-500 mt-2 tracking-widest">
+                    {isCloudAudio ? "Streamed from Cloud" : "Voice Memo Captured"}
+                  </div>
                 </div>
               </div>
               <audio

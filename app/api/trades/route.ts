@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       accountId, symbol, direction, entryPrice, exitPrice, stopLoss,
       takeProfit, lotSize, date, time, session, strategyId,
       notes, preTradePlan, postTradeReview, emotion, pnl, actualR, imageUrl,
-      audioId, mistakes, tags, result
+      audioId, audioUrl, mistakes, tags, result
     } = body
 
     if (!accountId) {
@@ -124,6 +124,7 @@ export async function POST(req: Request) {
           rewardToRisk: metrics.rewardToRisk,
           status: "CLOSED",
           audioId,
+          audioUrl, // Now saving the Cloud URL
           mistakes: {
             connectOrCreate: (mistakes || []).map((m: string) => ({
               where: { name_userId: { name: m, userId: user.id } },

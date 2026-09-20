@@ -37,9 +37,8 @@ export default function NewTradePage() {
 
   const [selectedMistakes, setSelectedMistakes] = useState<string[]>([])
   const [tags, setTags] = useState<string[]>([])
-  const [currentTag, setCurrentTag] = useState("")
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [audioId, setAudioId] = useState<string | null>(null)
+  const [audioData, setAudioData] = useState<{id: string | null, url: string | null}>({ id: null, url: null })
 
   useEffect(() => {
     async function fetchData() {
@@ -68,9 +67,7 @@ export default function NewTradePage() {
     const file = e.target.files?.[0]
     if (file) {
       const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string)
-      }
+      reader.onloadend = () => setImagePreview(reader.result as string)
       reader.readAsDataURL(file)
     }
   }
@@ -95,7 +92,8 @@ export default function NewTradePage() {
           mistakes: selectedMistakes,
           tags: tags,
           imageUrl: imagePreview,
-          audioId: audioId,
+          audioId: audioData.id,
+          audioUrl: audioData.url, // Save the cloud link
           result: formData.result
         }),
       })
@@ -281,7 +279,7 @@ export default function NewTradePage() {
               {imagePreview && <button type="button" onClick={() => setImagePreview(null)} className="absolute top-2 right-2 p-1 bg-black/60 rounded-full text-white hover:bg-danger z-20 transition-colors"> <X className="w-3 h-3" /> </button>}
             </div>
 
-            <AudioRecorder onAudioSaved={(id) => setAudioId(id)} onDelete={() => setAudioId(null)} />
+            <AudioRecorder onAudioSaved={(id, url) => setAudioData({ id, url })} onDelete={() => setAudioData({ id: null, url: null })} />
           </div>
         </div>
       </div>

@@ -97,7 +97,7 @@ export async function PATCH(
       symbol, direction, entryPrice, exitPrice, stopLoss,
       takeProfit, lotSize, date, time, session, strategyId,
       notes, preTradePlan, postTradeReview, emotion, result,
-      mistakes, tags, pnl, actualR, audioId
+      mistakes, tags, pnl, actualR, audioId, audioUrl
     } = body
 
     const oldTrade = await prisma.trade.findUnique({
@@ -163,6 +163,7 @@ export async function PATCH(
           rewardToRisk: metrics.rewardToRisk,
           status: "CLOSED",
           audioId: audioId !== undefined ? audioId : oldTrade.audioId,
+          audioUrl: audioUrl !== undefined ? audioUrl : oldTrade.audioUrl,
           mistakes: {
             set: [],
             connectOrCreate: (mistakes || []).map((m: string) => ({
