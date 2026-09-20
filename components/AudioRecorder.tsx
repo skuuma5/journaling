@@ -42,20 +42,33 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
     }
   }
 
+  const getSupportedMimeType = () => {
+    const types = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav'];
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return '';
+  }
+
   const startRecording = async () => {
-    if (typeof window === "undefined" || !navigator.mediaDevices) return
+    if (typeof window === "undefined" || !navigator.mediaDevices) {
+      alert("Recording not supported on this browser.")
+      return
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      mediaRecorder.current = new MediaRecorder(stream)
+      const mimeType = getSupportedMimeType();
+
+      mediaRecorder.current = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
       audioChunks.current = []
 
       mediaRecorder.current.ondataavailable = (event) => {
-        audioChunks.current.push(event.data)
+        if (event.data.size > 0) audioChunks.current.push(event.data)
       }
 
       mediaRecorder.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' })
+        const audioBlob = new Blob(audioChunks.current, { type: mimeType || 'audio/wav' })
         const localId = `audio-${Date.now()}`
 
         await saveAudio(localId, audioBlob)
@@ -64,7 +77,10 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
         setIsUploading(true)
         try {
           const supabase = createClient()
-          const fileName = `${localId}.webm`
+          // Use correct extension based on mimeType
+          const ext = mimeType.includes('mp4') ? 'mp4' : 'webm'
+          const fileName = `${localId}.${ext}`
+
           const { data, error } = await supabase.storage
             .from('trade-audios')
             .upload(fileName, audioBlob)
@@ -89,7 +105,7 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
       mediaRecorder.current.start()
       setIsRecording(true)
     } catch (err) {
-      alert("Microphone access denied.")
+      alert("Microphone access denied. Please enable microphone permissions in your settings.")
     }
   }
 
@@ -128,7 +144,7 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
           Audio Journal {isUploading && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
         </label>
         {audioUrl && (
-          <button type="button" onClick={handleDelete} className="text-danger hover:text-danger/80 transition-colors">
+          <button type="button" onClick={handleDelete} className="text-danger hover:text-danger/80 transition-colors p-1">
             <Trash2 className="w-4 h-4" />
           </button>
         )}
@@ -140,33 +156,33 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
             type="button"
             onClick={isRecording ? stopRecording : startRecording}
             className={cn(
-              "flex items-center justify-center w-12 h-12 rounded-full transition-all",
+              "flex items-center justify-center w-14 h-14 rounded-full transition-all shadow-xl active:scale-90",
               isRecording ? "bg-danger animate-pulse" : "bg-white text-black hover:bg-neutral-200"
             )}
           >
-            {isRecording ? <Square className="w-5 h-5 fill-white" /> : <Mic className="w-5 h-5" />}
+            {isRecording ? <Square className="w-6 h-6 fill-white" /> : <Mic className="w-6 h-6" />}
           </button>
         ) : (
           <button
             type="button"
             onClick={togglePlay}
-            className="flex items-center justify-center w-12 h-12 rounded-full bg-white text-black hover:bg-neutral-200 transition-all"
+            className="flex items-center justify-center w-14 h-14 rounded-full bg-white text-black hover:bg-neutral-200 transition-all shadow-xl active:scale-90"
           >
-            {isPlaying ? <Pause className="w-5 h-5 fill-black" /> : <Play className="w-5 h-5 fill-black ml-1" />}
+            {isPlaying ? <Pause className="w-6 h-6 fill-black" /> : <Play className="w-6 h-6 fill-black ml-1" />}
           </button>
         )}
 
         <div className="flex-1">
           {isRecording ? (
-            <div className="text-[10px] font-black uppercase text-danger animate-pulse tracking-widest">Recording...</div>
+            <div className="text-[11px] font-black uppercase text-danger animate-pulse tracking-widest">Recording...</div>
           ) : isUploading ? (
-            <div className="text-[10px] font-black uppercase text-primary animate-pulse tracking-widest">Syncing to Cloud...</div>
+            <div className="text-[11px] font-black uppercase text-primary animate-pulse tracking-widest">Syncing to Cloud...</div>
           ) : audioUrl ? (
-            <div className="text-[10px] font-black uppercase text-success tracking-widest flex items-center gap-2">
-              <UploadCloud className="w-3.5 h-3.5" /> Memo Secured
+            <div className="text-[11px] font-black uppercase text-success tracking-widest flex items-center gap-2">
+              <UploadCloud className="w-4 h-4" /> Memo Secured
             </div>
           ) : (
-            <div className="text-[10px] font-black uppercase text-neutral-500 tracking-widest italic">No audio recorded</div>
+            <div className="text-[10px] font-black uppercase text-neutral-500 tracking-widest italic leading-tight">Tap icon to record voice analysis</div>
           )}
         </div>
       </div>
@@ -177,6 +193,7 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
           src={audioUrl}
           onEnded={() => setIsPlaying(false)}
           className="hidden"
+          playsInline
         />
       )}
     </div>

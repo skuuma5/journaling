@@ -36,7 +36,6 @@ const menuItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [accounts, setAccounts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -80,11 +79,9 @@ export function Sidebar() {
   const toggleSidebar = () => setIsOpen(!isOpen)
   const closeSidebar = () => setIsOpen(false)
 
-  // CRITICAL: Return null if on auth page or not logged in
   if (isAuthPage || (!isAuthenticated && !loading)) return null
   if (loading) return null
 
-  // Logic: If user has NO accounts, only show "Accounts" and "Settings"
   const hasAccounts = accounts.length > 0
   const filteredMenuItems = menuItems.filter(item => {
     if (!hasAccounts) {
@@ -95,22 +92,34 @@ export function Sidebar() {
 
   return (
     <>
-      <button
-        className="lg:hidden fixed top-4 left-4 z-[60] p-2 bg-card border border-border rounded-md text-white"
-        onClick={toggleSidebar}
-      >
-        {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-      </button>
+      {/* Mobile Header/Toggle */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-[60] flex items-center justify-between px-4">
+        <Link href="/" onClick={closeSidebar} className="text-lg font-black tracking-tighter text-white flex items-center gap-2">
+          <Activity className="w-5 h-5 text-white" />
+          JOURNALING
+        </Link>
+        <button
+          className="p-2 text-white hover:bg-neutral-900 rounded-md transition-colors"
+          onClick={toggleSidebar}
+        >
+          {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+      </div>
 
+      {/* Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[50] lg:hidden" onClick={closeSidebar} />
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[65] lg:hidden"
+          onClick={closeSidebar}
+        />
       )}
 
+      {/* Sidebar Container */}
       <div className={cn(
-        "flex flex-col h-screen w-64 border-r border-border bg-card text-card-foreground fixed left-0 top-0 z-[55] transition-transform duration-300 lg:translate-x-0",
+        "flex flex-col h-screen w-[280px] lg:w-64 border-r border-border bg-card text-card-foreground fixed left-0 top-0 z-[70] transition-transform duration-300 ease-in-out lg:translate-x-0",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="p-6">
+        <div className="p-6 hidden lg:block">
           <Link href="/" onClick={closeSidebar} className="text-xl font-black tracking-tighter text-white flex items-center gap-2 group">
             <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center group-hover:rotate-6 transition-transform">
               <Activity className="w-5 h-5 text-black" />
@@ -119,44 +128,58 @@ export function Sidebar() {
           </Link>
         </div>
 
-        <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-          <p className="px-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Main Menu</p>
+        {/* Mobile Sidebar Close Button */}
+        <div className="lg:hidden p-6 flex justify-between items-center border-b border-border mb-4">
+          <span className="font-black text-white tracking-widest text-xs uppercase">Terminal Menu</span>
+          <button onClick={closeSidebar} className="p-2 text-muted-foreground hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
+          <p className="px-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 opacity-50">Main Menu</p>
           {filteredMenuItems.map((item) => (
             <Link
               key={item.name}
               href={item.href}
               onClick={closeSidebar}
               className={cn(
-                "flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-md transition-all group",
-                pathname === item.href ? "bg-white text-black" : "text-muted-foreground hover:bg-neutral-900 hover:text-white"
+                "flex items-center gap-3 px-3 py-3 text-sm font-bold rounded-md transition-all group",
+                pathname === item.href ? "bg-white text-black shadow-lg" : "text-muted-foreground hover:bg-neutral-900 hover:text-white"
               )}
             >
-              <item.icon className="w-4 h-4" />
+              <item.icon className={cn(
+                "w-4 h-4",
+                pathname === item.href ? "text-black" : "text-muted-foreground group-hover:text-white"
+              )} />
               {item.name}
             </Link>
           ))}
 
           {!hasAccounts && (
-            <div className="mt-4 px-3 py-4 bg-primary/5 border border-primary/10 rounded-md">
-              <p className="text-[10px] font-black text-primary uppercase tracking-widest leading-tight">Initialization Required</p>
-              <p className="text-[9px] text-muted-foreground mt-1 font-medium">Create a trading terminal to unlock full analytics.</p>
+            <div className="mt-6 mx-3 p-4 bg-primary/5 border border-primary/10 rounded-lg">
+              <p className="text-[10px] font-black text-primary uppercase tracking-widest leading-tight">Terminal Required</p>
+              <p className="text-[9px] text-muted-foreground mt-2 font-medium">Create an account to unlock all features.</p>
             </div>
           )}
         </nav>
 
         {hasAccounts && (
           <div className="p-4 border-t border-border bg-neutral-900/10">
-            <p className="px-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3">Terminals</p>
+            <p className="px-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 opacity-50">Active Terminals</p>
             <div className="space-y-2">
               {accounts.slice(0, 3).map((account) => (
                 <Link
                   key={account.id}
                   href={`/accounts/${account.id}`}
                   onClick={closeSidebar}
-                  className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-neutral-900/50"
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-neutral-900/50 transition-all border border-transparent",
+                    pathname === `/accounts/${account.id}` ? "border-border bg-neutral-900/50" : ""
+                  )}
                 >
-                  <div className={cn("w-2 h-2 rounded-full", account.status === "HEALTHY" ? "bg-success" : "bg-danger")} />
-                  <p className="text-[10px] font-black text-white truncate uppercase">{account.name}</p>
+                  <div className={cn("w-2 h-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]", account.status === "HEALTHY" ? "bg-success" : "bg-danger")} />
+                  <p className="text-[10px] font-black text-white truncate uppercase tracking-tight">{account.name}</p>
                 </Link>
               ))}
             </div>
