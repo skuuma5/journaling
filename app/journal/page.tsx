@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { format, startOfDay } from "date-fns"
+import { format, addDays, subDays, startOfDay } from "date-fns"
+import Link from "next/link"
 import {
   Calendar,
   Save,
@@ -16,7 +17,9 @@ import {
   TrendingUp,
   History,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react"
 import { cn, formatCurrency } from "@/lib/utils"
 
@@ -43,21 +46,22 @@ export default function JournalPage() {
     async function fetchData() {
       setLoading(true)
       try {
+        // Fetch entry for the specific date
         const [entryRes, tradesRes] = await Promise.all([
           fetch(`/api/journal?date=${date.toISOString()}`),
-          fetch(`/api/trades`) // In a real app, filter trades by date on server
+          fetch(`/api/trades`)
         ])
 
         const entry = await entryRes.json()
         const allTrades = await tradesRes.json()
 
-        // Filter trades for the selected day locally for the demo
+        // Filter trades for the selected day locally
         const dayTrades = allTrades.filter((t: any) =>
           format(new Date(t.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
         )
         setTrades(dayTrades)
 
-        if (entry.id) {
+        if (entry && entry.id) {
           setFormData({
             marketBias: entry.marketBias || "",
             importantNews: entry.importantNews || "",
@@ -71,6 +75,7 @@ export default function JournalPage() {
             rating: entry.rating || 5
           })
         } else {
+          // Reset form for new days
           setFormData({
             marketBias: "",
             importantNews: "",
@@ -96,11 +101,14 @@ export default function JournalPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await fetch('/api/journal', {
+      const res = await fetch('/api/journal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, date: date.toISOString() })
       })
+      if (res.ok) {
+        // Show success state if needed
+      }
     } catch (e) {
       alert("Failed to save entry")
     } finally {
@@ -115,20 +123,47 @@ export default function JournalPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Daily Performance Journal</h2>
-          <p className="text-muted-foreground font-medium">Capture market context, bias, and execution reviews.</p>
+          <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest">Capture market context and execution reviews.</p>
         </div>
-        <div className="flex gap-3 w-full md:w-auto">
-           <div className="bg-card border border-border rounded-md px-4 py-2 flex items-center gap-3">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs font-black uppercase tracking-widest">{format(date, 'EEEE, MMMM do')}</span>
+
+        <div className="flex flex-wrap gap-3 w-full md:w-auto">
+           {/* Date Navigation */}
+           <div className="flex items-center bg-card border border-border rounded-md overflow-hidden">
+              <button
+                onClick={() => setDate(prev => subDays(prev, 1))}
+                className="p-2 hover:bg-neutral-800 border-r border-border transition-colors"
+                title="Previous Day"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <div className="px-4 py-2 flex items-center gap-3 relative group">
+                <Calendar className="w-4 h-4 text-primary" />
+                <span className="text-xs font-black uppercase tracking-widest">{format(date, 'MMM dd, yyyy')}</span>
+                <input
+                  type="date"
+                  value={format(date, 'yyyy-MM-dd')}
+                  onChange={(e) => setDate(new Date(e.target.value))}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+              </div>
+
+              <button
+                onClick={() => setDate(prev => addDays(prev, 1))}
+                className="p-2 hover:bg-neutral-800 border-l border-border transition-colors"
+                title="Next Day"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
            </div>
+
            <button
              onClick={handleSave}
              disabled={saving}
              className="flex-1 md:flex-none bg-white text-black px-6 py-2 rounded-md text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-neutral-200 transition-all active:scale-95 disabled:opacity-50"
            >
              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-             Save Daily Log
+             {saving ? 'Saving...' : 'Save Daily Log'}
            </button>
         </div>
       </div>
@@ -248,7 +283,7 @@ export default function JournalPage() {
               <div className="p-4 bg-neutral-900/50 border-b border-border flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <History className="w-4 h-4 text-purple-500" />
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Trades Taken</h3>
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Trades for this day</h3>
                 </div>
                 <span className={cn(
                   "text-[10px] font-black",
@@ -259,10 +294,12 @@ export default function JournalPage() {
               </div>
               <div className="divide-y divide-border">
                 {trades.length === 0 ? (
-                  <div className="p-8 text-center text-[9px] font-black text-muted-foreground uppercase tracking-widest">No trades recorded today.</div>
+                  <div className="p-8 text-center text-[9px] font-black text-muted-foreground uppercase tracking-widest italic opacity-50">
+                    No trades found for this date.
+                  </div>
                 ) : (
                   trades.map(trade => (
-                    <div key={trade.id} className="p-3 flex items-center justify-between hover:bg-neutral-900/30 transition-colors">
+                    <Link href={`/trades/${trade.id}`} key={trade.id} className="p-3 flex items-center justify-between hover:bg-neutral-900/30 transition-colors block">
                       <div className="flex items-center gap-3">
                         <div className={cn(
                           "w-8 h-8 rounded flex items-center justify-center text-[8px] font-black border",
@@ -284,7 +321,7 @@ export default function JournalPage() {
                         </div>
                         <span className="text-[8px] font-bold text-muted-foreground">{format(new Date(trade.date), 'HH:mm')}</span>
                       </div>
-                    </div>
+                    </Link>
                   ))
                 )}
               </div>
@@ -302,7 +339,7 @@ export default function JournalPage() {
                   <select
                     value={formData.mood}
                     onChange={(e) => setFormData({...formData, mood: e.target.value})}
-                    className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-xs font-bold outline-none"
+                    className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-xs font-bold outline-none cursor-pointer"
                   >
                     <option>Calm / Neutral</option>
                     <option>Confident / Flow</option>
@@ -338,13 +375,13 @@ export default function JournalPage() {
                   value={formData.mistakes}
                   onChange={(e) => setFormData({...formData, mistakes: e.target.value})}
                   placeholder="Identify FOMO, revenge trading, or rule breaches..."
-                  className="w-full bg-neutral-900/50 border border-border rounded-lg p-3 text-[11px] focus:ring-1 focus:ring-white/20 outline-none min-h-[100px] resize-none"
+                  className="w-full bg-neutral-900/50 border border-border rounded-lg p-3 text-[11px] focus:ring-1 focus:ring-white/20 outline-none min-h-[100px] resize-none text-white"
                 />
               </div>
             </div>
 
             <div className="bg-neutral-900/30 border border-border rounded-xl p-6">
-              <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-4">Summary</h4>
+              <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-4">Day Summary</h4>
               <div className="space-y-3">
                  <div className="flex justify-between items-center">
                     <span className="text-[10px] font-bold text-muted-foreground uppercase">Volume</span>

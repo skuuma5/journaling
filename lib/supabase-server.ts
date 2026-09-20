@@ -1,10 +1,12 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { getLocalSession } from './auth-local'
 
 export const createClient = () => {
   const cookieStore = cookies()
+  const localUserId = getLocalSession()
 
-  return createServerClient(
+  const client = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -15,22 +17,35 @@ export const createClient = () => {
         set(name: string, value: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value, ...options })
-          } catch (error) {
-            // The `set` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
+          } catch (error) {}
         },
         remove(name: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value: '', ...options })
-          } catch (error) {
-            // The `remove` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
+          } catch (error) {}
         },
       },
     }
   )
+
+  // Use Local Session if it exists
+  if (localUserId) {
+    return {
+      ...client,
+      auth: {
+        ...client.auth,
+        getUser: async () => ({
+          data: { user: { id: localUserId, email: null } },
+          error: null,
+        }),
+        getSession: async () => ({
+          data: { session: { user: { id: localUserId, email: null } } },
+          error: null,
+        }),
+      },
+    } as any
+  }
+
+  // Removed general development mock to allow real login flow testing
+  return client
 }

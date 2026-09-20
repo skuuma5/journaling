@@ -1,20 +1,29 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { createClient } from '@/lib/supabase-server'
 import { calculateTradeMetrics } from "@/lib/trading-calculations"
 
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   try {
     const trade = await prisma.trade.findUnique({
-      where: { id: params.id },
+      where: {
+        id: params.id,
+        account: { userId: user.id }
+      },
       include: {
         account: true,
         strategy: true,
         tags: { include: { tag: true } },
         mistakes: true,
-        images: true, // Crucial fix for the undefined error
+        images: true,
       },
     })
 
@@ -32,9 +41,17 @@ export async function DELETE(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   try {
     const trade = await prisma.trade.findUnique({
-      where: { id: params.id },
+      where: {
+        id: params.id,
+        account: { userId: user.id }
+      },
     })
 
     if (!trade) {
@@ -42,7 +59,6 @@ export async function DELETE(
     }
 
     await prisma.$transaction(async (tx) => {
-      // Revert the account balance
       if (trade.pnl) {
         await tx.account.update({
           where: { id: trade.accountId },
@@ -54,7 +70,6 @@ export async function DELETE(
         })
       }
 
-      // Delete the trade
       await tx.trade.delete({
         where: { id: params.id },
       })
@@ -71,17 +86,22 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   try {
     const body = await req.json()
     const {
       symbol, direction, entryPrice, exitPrice, stopLoss,
       takeProfit, lotSize, date, time, session, strategyId,
       notes, preTradePlan, postTradeReview, emotion, result,
-      mistakes, tags
+      mistakes, tags, pnl, actualR, audioId
     } = body
 
     const oldTrade = await prisma.trade.findUnique({
-      where: { id: params.id },
+      where: { id: params.id, account: { userId: user.id } },
       include: { account: true }
     })
 
@@ -96,25 +116,28 @@ export async function PATCH(
       tp: takeProfit ? parseFloat(takeProfit) : null,
       lots: parseFloat(lotSize),
       direction,
-      accountBalance: oldTrade.account.currentBalance - (oldTrade.pnl || 0) // Balance before this trade
+      accountBalance: oldTrade.account.currentBalance - (oldTrade.pnl || 0)
     })
+
+    const finalPnl = pnl !== null && pnl !== undefined && pnl !== "" ? parseFloat(pnl) : metrics.pnl
+    const finalActualR = actualR !== null && actualR !== undefined && actualR !== "" ? parseFloat(actualR) : metrics.actualR
+
+    let finalResult = result || "BREAKEVEN"
+    if (!result) {
+      if (finalPnl > 0) finalResult = "WIN"
+      else if (finalPnl < 0) finalResult = "LOSS"
+    }
 
     const tradeDate = new Date(`${date}T${time}`)
 
     const updatedTrade = await prisma.$transaction(async (tx) => {
-      // 1. Revert old P&L from balance
       if (oldTrade.pnl) {
         await tx.account.update({
           where: { id: oldTrade.accountId },
-          data: {
-            currentBalance: {
-              decrement: oldTrade.pnl
-            }
-          }
+          data: { currentBalance: { decrement: oldTrade.pnl } }
         })
       }
 
-      // 2. Update the trade
       const trade = await tx.trade.update({
         where: { id: params.id },
         data: {
@@ -132,29 +155,28 @@ export async function PATCH(
           preTradePlan,
           postTradeReview,
           emotion,
-          result,
-          pnl: metrics.pnl,
-          actualR: metrics.actualR,
+          result: finalResult,
+          pnl: finalPnl,
+          actualR: finalActualR,
           riskAmount: metrics.riskAmount,
           riskPercent: metrics.riskPercent,
           rewardToRisk: metrics.rewardToRisk,
           status: "CLOSED",
-          // Update mistakes
+          audioId: audioId !== undefined ? audioId : oldTrade.audioId,
           mistakes: {
-            set: [], // Clear old
+            set: [],
             connectOrCreate: (mistakes || []).map((m: string) => ({
-              where: { name: m },
-              create: { name: m }
+              where: { name_userId: { name: m, userId: user.id } },
+              create: { name: m, userId: user.id }
             }))
           },
-          // Update tags
           tags: {
             deleteMany: {},
             create: (tags || []).map((t: string) => ({
               tag: {
                 connectOrCreate: {
-                  where: { name: t },
-                  create: { name: t }
+                  where: { name_userId: { name: t, userId: user.id } },
+                  create: { name: t, userId: user.id }
                 }
               }
             }))
@@ -162,14 +184,9 @@ export async function PATCH(
         }
       })
 
-      // 3. Apply new P&L to balance
       await tx.account.update({
         where: { id: oldTrade.accountId },
-        data: {
-          currentBalance: {
-            increment: metrics.pnl
-          }
-        }
+        data: { currentBalance: { increment: finalPnl } }
       })
 
       return trade

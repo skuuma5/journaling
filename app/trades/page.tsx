@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { formatCurrency, cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { Search, ArrowUpDown, ChevronRight, Loader2, Filter } from "lucide-react"
+import { Search, ArrowUpDown, ChevronRight, MoreHorizontal, Loader2, Filter } from "lucide-react"
 import Link from "next/link"
 
 export default function TradesPage() {
@@ -18,9 +18,7 @@ export default function TradesPage() {
       try {
         const res = await fetch('/api/trades')
         const data = await res.json()
-        if (Array.isArray(data)) {
-          setTrades(data)
-        }
+        if (Array.isArray(data)) setTrades(data)
       } catch (e) {
         console.error("Failed to fetch trades:", e)
       } finally {
@@ -37,35 +35,27 @@ export default function TradesPage() {
     }))
   }
 
-  // منطق الفلترة والبحث
+  // منطق البحث والفلترة والترتيب
   const processedTrades = [...trades]
     .filter(trade => {
       const searchStr = search.toLowerCase().trim()
       const symbolMatch = (trade.symbol || "").toLowerCase().includes(searchStr)
       const accountMatch = (trade.account?.name || "").toLowerCase().includes(searchStr)
-
       const matchesSearch = !searchStr || symbolMatch || accountMatch
       const matchesFilter = filterResult === "ALL" || trade.result === filterResult
-
       return matchesSearch && matchesFilter
     })
     .sort((a, b) => {
       let aVal: any = a[sortConfig.key]
       let bVal: any = b[sortConfig.key]
-
       if (sortConfig.key === 'account') {
         aVal = a.account?.name || ""
         bVal = b.account?.name || ""
       }
-
       if (sortConfig.key === 'date') {
         aVal = new Date(a.date).getTime()
         bVal = new Date(b.date).getTime()
       }
-
-      if (aVal === null || aVal === undefined) return 1
-      if (bVal === null || bVal === undefined) return -1
-
       if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
       return 0
@@ -84,7 +74,6 @@ export default function TradesPage() {
       </div>
 
       <div className="bg-card border border-border rounded-xl overflow-hidden shadow-2xl">
-        {/* Toolbar */}
         <div className="p-4 border-b border-border bg-neutral-900/50 flex flex-col md:flex-row gap-4 justify-between items-center">
           <div className="relative flex-1 max-w-sm w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
@@ -93,39 +82,23 @@ export default function TradesPage() {
               placeholder="Search symbol or account..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-neutral-950 border border-border rounded-md pl-10 pr-4 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-white/20 uppercase tracking-widest transition-all"
+              className="w-full bg-neutral-950 border border-border rounded-md pl-10 pr-4 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-white/20 uppercase tracking-widest"
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            {/* Filter Toggle */}
-            <div className="flex bg-neutral-950 p-1 rounded-md border border-border">
-              {["ALL", "WIN", "LOSS"].map((res) => (
-                <button
-                  key={res}
-                  onClick={() => setFilterResult(res)}
-                  className={cn(
-                    "px-4 py-1 text-[9px] font-black uppercase tracking-widest rounded transition-all",
-                    filterResult === res ? "bg-white text-black shadow-lg" : "text-neutral-500 hover:text-white"
-                  )}
-                >
-                  {res}
-                </button>
-              ))}
-            </div>
-
-            <div className="h-8 w-px bg-border mx-2 hidden md:block" />
-
-            <button
-                onClick={() => handleSort('pnl')}
+          <div className="flex bg-neutral-950 p-1 rounded-md border border-border">
+            {["ALL", "WIN", "LOSS"].map((res) => (
+              <button
+                key={res}
+                onClick={() => setFilterResult(res)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 bg-neutral-950 border border-border rounded-md text-[10px] font-black uppercase tracking-widest transition-colors group",
-                  sortConfig.key === 'pnl' ? "text-white border-white/20" : "text-neutral-400 hover:text-white"
+                  "px-4 py-1 text-[9px] font-black uppercase tracking-widest rounded transition-all",
+                  filterResult === res ? "bg-white text-black shadow-lg" : "text-neutral-500 hover:text-white"
                 )}
-            >
-              <ArrowUpDown className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-              Sort P&L
-            </button>
+              >
+                {res}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -133,12 +106,12 @@ export default function TradesPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-border bg-neutral-900/30 text-[10px] uppercase tracking-[0.2em] font-black text-neutral-500">
-                <th className="px-6 py-5 cursor-pointer hover:text-white" onClick={() => handleSort('date')}>Date</th>
-                <th className="px-6 py-5 cursor-pointer hover:text-white" onClick={() => handleSort('symbol')}>Symbol</th>
+                <th className="px-6 py-5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('date')}>Date</th>
+                <th className="px-6 py-5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('symbol')}>Symbol</th>
                 <th className="px-6 py-5">Dir</th>
                 <th className="px-6 py-5 cursor-pointer hover:text-white" onClick={() => handleSort('account')}>Account</th>
-                <th className="px-6 py-4 text-right">Entry</th>
-                <th className="px-6 py-4 text-right">Exit</th>
+                <th className="px-6 py-5 text-right">Entry</th>
+                <th className="px-6 py-5 text-right">Exit</th>
                 <th className="px-6 py-4 text-right cursor-pointer hover:text-white" onClick={() => handleSort('pnl')}>P&L</th>
                 <th className="px-6 py-4 text-right cursor-pointer hover:text-white" onClick={() => handleSort('actualR')}>R</th>
                 <th className="px-6 py-4 text-center">Result</th>
@@ -149,13 +122,13 @@ export default function TradesPage() {
               {loading ? (
                 <tr><td colSpan={10} className="px-6 py-20 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-neutral-500 opacity-20" /></td></tr>
               ) : processedTrades.length === 0 ? (
-                <tr><td colSpan={10} className="px-6 py-20 text-center text-neutral-500 text-[10px] font-black uppercase tracking-[0.2em] opacity-30">Zero records found.</td></tr>
+                <tr><td colSpan={10} className="px-6 py-20 text-center text-neutral-500 text-[10px] font-black uppercase tracking-[0.2em] opacity-30">No matching records.</td></tr>
               ) : (
                 processedTrades.map((trade) => (
                   <tr key={trade.id} className="hover:bg-neutral-900/50 transition-all group border-l-2 border-transparent hover:border-white">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-[11px] font-black text-white uppercase tracking-tight">{format(new Date(trade.date), 'MMM d, yyyy')}</div>
-                      <div className="text-[9px] text-neutral-500 font-bold uppercase">{format(new Date(trade.date), 'HH:mm')}</div>
+                      <div className="text-[9px] text-neutral-500 font-bold uppercase">{format(new Date(trade.date), 'HH:mm')} • {trade.session}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap font-black text-white uppercase tracking-tighter">{trade.symbol}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -171,12 +144,7 @@ export default function TradesPage() {
                       {(trade.actualR || 0).toFixed(2)}R
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={cn(
-                        "text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest",
-                        (trade.pnl || 0) >= 0 ? "bg-success text-white shadow-[0_0_10px_rgba(16,185,129,0.2)]" : "bg-danger text-white shadow-[0_0_10px_rgba(239,68,68,0.2)]"
-                      )}>
-                        {(trade.pnl || 0) >= 0 ? "WIN" : "LOSS"}
-                      </span>
+                      <span className={cn("text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest", trade.result === "WIN" ? "bg-success text-white shadow-[0_0_10px_rgba(16,185,129,0.2)]" : trade.result === "LOSS" ? "bg-danger text-white shadow-[0_0_10px_rgba(239,68,68,0.2)]" : "bg-neutral-800 text-neutral-400")}>{trade.result}</span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

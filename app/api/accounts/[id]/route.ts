@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { createClient } from '@/lib/supabase-server'
 
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   try {
     const account = await prisma.account.findUnique({
-      where: { id: params.id },
+      where: {
+        id: params.id,
+        userId: user.id // أمان: التأكد من الملكية
+      },
       include: {
         _count: {
           select: { trades: true }
@@ -29,19 +38,27 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   try {
     const body = await req.json()
     const { name, initialBalance, currency, profitTarget, maxDrawdown, dailyLossLimit, accountType, status } = body
 
     const account = await prisma.account.update({
-      where: { id: params.id },
+      where: {
+        id: params.id,
+        userId: user.id // أمان: التأكد من الملكية
+      },
       data: {
         name,
-        initialBalance,
+        initialBalance: parseFloat(initialBalance),
         currency,
-        profitTarget,
-        maxDrawdown,
-        dailyLossLimit,
+        profitTarget: parseFloat(profitTarget) || null,
+        maxDrawdown: parseFloat(maxDrawdown) || null,
+        dailyLossLimit: parseFloat(dailyLossLimit) || null,
         accountType,
         status,
       }
@@ -57,9 +74,17 @@ export async function DELETE(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   try {
     await prisma.account.delete({
-      where: { id: params.id }
+      where: {
+        id: params.id,
+        userId: user.id // أمان: التأكد من الملكية
+      }
     })
 
     return NextResponse.json({ message: "Account deleted" })

@@ -12,7 +12,8 @@ import {
   ArrowDownRight,
   Calendar as CalendarIcon,
   Target,
-  Loader2
+  Loader2,
+  AlertCircle
 } from "lucide-react"
 import Link from "next/link"
 import { formatCurrency, cn } from "@/lib/utils"
@@ -23,17 +24,25 @@ import { format } from "date-fns"
 export default function Dashboard() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedAccountId, setSelectedAccountId] = useState("all")
 
   useEffect(() => {
     async function fetchDashboardData() {
       setLoading(true)
+      setError(null)
       try {
         const res = await fetch(`/api/dashboard/stats?accountId=${selectedAccountId}`)
         const json = await res.json()
-        setData(json)
+
+        if (json.error) {
+          setError(json.error)
+        } else {
+          setData(json)
+        }
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error)
+        setError("Failed to connect to the terminal API")
       } finally {
         setLoading(false)
       }
@@ -41,7 +50,7 @@ export default function Dashboard() {
     fetchDashboardData()
   }, [selectedAccountId])
 
-  if (loading || !data) {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
         <Loader2 className="w-8 h-8 text-white animate-spin" />
@@ -50,13 +59,25 @@ export default function Dashboard() {
     )
   }
 
+  if (error || !data || !data.stats) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
+        <AlertCircle className="w-8 h-8 text-danger" />
+        <p className="text-white font-black uppercase tracking-[0.2em] text-xs">{error || "No data available"}</p>
+        <Link href="/accounts/new" className="mt-4 bg-white text-black px-6 py-2 rounded-md text-[10px] font-black uppercase tracking-widest">
+          Initialize First Terminal
+        </Link>
+      </div>
+    )
+  }
+
   const statsCards = [
-    { label: "Total Balance", value: formatCurrency(data.stats.totalBalance), subValue: "Live", trend: "neutral" as const },
-    { label: "Total P&L", value: `${data.stats.totalPnl >= 0 ? "+" : ""}${formatCurrency(data.stats.totalPnl)}`, subValue: "All Time", trend: data.stats.totalPnl >= 0 ? "up" as const : "down" as const },
-    { label: "Win Rate", value: `${data.stats.winRate.toFixed(1)}%`, subValue: "Target 60%", trend: data.stats.winRate >= 60 ? "up" as const : "neutral" as const },
-    { label: "Profit Factor", value: data.stats.profitFactor.toFixed(2), subValue: "Healthy", trend: data.stats.profitFactor >= 1.5 ? "up" as const : "neutral" as const },
-    { label: "Max Drawdown", value: `${data.stats.maxDrawdown}%`, subValue: "Relative", trend: "neutral" as const },
-    { label: "Trades", value: data.stats.totalTrades, subValue: "Executed", trend: "neutral" as const },
+    { label: "Total Balance", value: formatCurrency(data.stats.totalBalance || 0), subValue: "Live", trend: "neutral" as const },
+    { label: "Total P&L", value: `${(data.stats.totalPnl || 0) >= 0 ? "+" : ""}${formatCurrency(data.stats.totalPnl || 0)}`, subValue: "All Time", trend: (data.stats.totalPnl || 0) >= 0 ? "up" as const : "down" as const },
+    { label: "Win Rate", value: `${(data.stats.winRate || 0).toFixed(1)}%`, subValue: "Target 60%", trend: (data.stats.winRate || 0) >= 60 ? "up" as const : "neutral" as const },
+    { label: "Profit Factor", value: (data.stats.profitFactor || 0).toFixed(2), subValue: "Healthy", trend: (data.stats.profitFactor || 0) >= 1.5 ? "up" as const : "neutral" as const },
+    { label: "Max Drawdown", value: `${data.stats.maxDrawdown || 0}%`, subValue: "Relative", trend: "neutral" as const },
+    { label: "Trades", value: data.stats.totalTrades || 0, subValue: "Executed", trend: "neutral" as const },
   ]
 
   return (
@@ -65,7 +86,7 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Terminal Dashboard</h2>
-          <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest">Monitoring {data.accounts.length} active trading accounts.</p>
+          <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest">Monitoring {data.accounts?.length || 0} active trading accounts.</p>
         </div>
         <div className="flex gap-3 w-full md:w-auto">
           <select
@@ -74,7 +95,7 @@ export default function Dashboard() {
             className="flex-1 md:flex-none bg-card border border-border rounded-md px-4 py-2 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-white/20 uppercase tracking-widest cursor-pointer"
           >
             <option value="all">All Accounts</option>
-            {data.accounts.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            {data.accounts?.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
           <Link
             href="/trades/new"
@@ -103,7 +124,7 @@ export default function Dashboard() {
             </h3>
           </div>
           <div className="h-[350px] w-full z-10">
-             <EquityChart data={data.equityCurve} />
+             <EquityChart data={data.equityCurve || []} />
           </div>
           <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
         </div>
@@ -115,7 +136,7 @@ export default function Dashboard() {
             Terminal Health
           </h3>
           <div className="space-y-6 flex-1 overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
-            {data.accounts.length === 0 ? (
+            {!data.accounts || data.accounts.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-10 opacity-50">
                 <Activity className="w-8 h-8 mb-2" />
                 <p className="text-[10px] font-bold uppercase tracking-widest">No Active Terminals</p>
@@ -134,21 +155,21 @@ export default function Dashboard() {
                     <div className="text-right">
                       <span className={cn(
                         "text-sm font-black",
-                        account.pnl >= 0 ? "text-success" : "text-danger"
+                        (account.pnl || 0) >= 0 ? "text-success" : "text-danger"
                       )}>
-                        {account.pnl >= 0 ? "+" : ""}{formatCurrency(account.pnl)}
+                        {(account.pnl || 0) >= 0 ? "+" : ""}{formatCurrency(account.pnl || 0)}
                       </span>
                     </div>
                   </div>
                   <div className="w-full bg-neutral-900/50 rounded-full h-1.5 border border-border/50 overflow-hidden">
                     <div
-                      className={cn("h-full transition-all duration-1000", account.pnl >= 0 ? "bg-success" : "bg-danger")}
-                      style={{ width: `${Math.min(100, Math.max(5, Math.abs(account.progress)))}%` }}
+                      className={cn("h-full transition-all duration-1000", (account.pnl || 0) >= 0 ? "bg-success" : "bg-danger")}
+                      style={{ width: `${Math.min(100, Math.max(5, Math.abs(account.progress || 0)))}%` }}
                     />
                   </div>
                   <div className="flex justify-between text-[9px] text-muted-foreground uppercase font-black tracking-widest">
-                    <span>Target {account.progress.toFixed(1)}%</span>
-                    <span>{formatCurrency(account.currentBalance)}</span>
+                    <span>Target {(account.progress || 0).toFixed(1)}%</span>
+                    <span>{formatCurrency(account.currentBalance || 0)}</span>
                   </div>
                 </Link>
               ))
@@ -171,7 +192,7 @@ export default function Dashboard() {
             <Link href="/trades" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-white transition-colors">Log View</Link>
           </div>
           <div className="divide-y divide-border">
-            {data.recentTrades.length === 0 ? (
+            {!data.recentTrades || data.recentTrades.length === 0 ? (
               <div className="p-10 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-30 italic">No executions recorded.</div>
             ) : (
               data.recentTrades.map((trade: any) => (
@@ -194,7 +215,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="font-black text-base text-white tracking-tight uppercase">{trade.symbol}</p>
-                      <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest">{trade.account.name}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest">{trade.account?.name || 'Unknown'}</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -207,7 +228,7 @@ export default function Dashboard() {
                         {(trade.pnl || 0) >= 0 ? "+" : ""}{formatCurrency(trade.pnl || 0)}
                       </p>
                     </div>
-                    <span className="text-[10px] font-bold text-neutral-500 uppercase">{format(new Date(trade.date), 'MMM d, HH:mm')}</span>
+                    <span className="text-[10px] font-bold text-neutral-500 uppercase">{trade.date ? format(new Date(trade.date), 'MMM d, HH:mm') : ''}</span>
                   </div>
                 </Link>
               ))
@@ -222,8 +243,8 @@ export default function Dashboard() {
               <div className="mt-8">
                  <p className="text-2xl font-black text-white tracking-tighter uppercase truncate">{data.topStrategy?.name || "N/A"}</p>
                  <div className="flex items-center gap-2 mt-2">
-                    <div className={cn("w-1.5 h-1.5 rounded-full", data.topStrategy?.pnl >= 0 ? "bg-success shadow-[0_0_8px_#10b981]" : "bg-danger shadow-[0_0_8px_#ef4444]")} />
-                    <span className={cn("text-[10px] font-black uppercase tracking-widest", data.topStrategy?.pnl >= 0 ? "text-success" : "text-danger")}>
+                    <div className={cn("w-1.5 h-1.5 rounded-full", (data.topStrategy?.pnl || 0) >= 0 ? "bg-success shadow-[0_0_8px_#10b981]" : "bg-danger shadow-[0_0_8px_#ef4444]")} />
+                    <span className={cn("text-[10px] font-black uppercase tracking-widest", (data.topStrategy?.pnl || 0) >= 0 ? "text-success" : "text-danger")}>
                         {data.topStrategy ? `${formatCurrency(data.topStrategy.pnl)} Realized` : "NO DATA"}
                     </span>
                  </div>
@@ -253,7 +274,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-7 sm:grid-cols-14 gap-1.5 z-10 relative">
                 {Array.from({ length: 28 }).map((_, i) => {
                   const dayDate = format(new Date(Date.now() - (27 - i) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
-                  const dayPnl = data.heatmapData[dayDate] || 0;
+                  const dayPnl = (data.heatmapData && data.heatmapData[dayDate]) || 0;
 
                   return (
                     <div

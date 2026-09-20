@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, Save, Upload, Plus, X, Tag as TagIcon, AlertCircle, ImageIcon, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import AudioRecorder from "@/components/AudioRecorder"
 
 export default function NewTradePage() {
   const router = useRouter()
@@ -31,13 +32,14 @@ export default function NewTradePage() {
     preTradePlan: "",
     postTradeReview: "",
     emotion: "Calm",
-    result: "WIN", // القيمة الافتراضية
+    result: "WIN",
   })
 
   const [selectedMistakes, setSelectedMistakes] = useState<string[]>([])
   const [tags, setTags] = useState<string[]>([])
   const [currentTag, setCurrentTag] = useState("")
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [audioId, setAudioId] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchData() {
@@ -85,10 +87,16 @@ export default function NewTradePage() {
           ...formData,
           pnl: formData.pnl ? parseFloat(formData.pnl) : null,
           actualR: formData.actualR ? parseFloat(formData.actualR) : null,
+          entryPrice: parseFloat(formData.entryPrice) || 0,
+          exitPrice: formData.exitPrice ? parseFloat(formData.exitPrice) : null,
+          stopLoss: formData.stopLoss ? parseFloat(formData.stopLoss) : null,
+          takeProfit: formData.takeProfit ? parseFloat(formData.takeProfit) : null,
+          lotSize: parseFloat(formData.lotSize) || 0,
           mistakes: selectedMistakes,
           tags: tags,
           imageUrl: imagePreview,
-          result: formData.result // إرسال النتيجة التي اخترتها يدوياً
+          audioId: audioId,
+          result: formData.result
         }),
       })
 
@@ -105,7 +113,6 @@ export default function NewTradePage() {
     }
   }
 
-  // منطق الألوان الديناميكي
   const pnlValue = parseFloat(formData.pnl)
   const isNegative = pnlValue < 0 || formData.result === "LOSS"
   const isPositive = pnlValue > 0 || formData.result === "WIN"
@@ -202,6 +209,14 @@ export default function NewTradePage() {
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Exit Price</label>
                 <input type="number" step="any" name="exitPrice" value={formData.exitPrice} onChange={handleChange} className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-white/20 text-white font-bold" />
               </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-danger/80">Stop Loss (SL)</label>
+                <input type="number" step="any" name="stopLoss" value={formData.stopLoss} onChange={handleChange} placeholder="0.0000" className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-danger/50 text-white font-bold" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-success/80">Take Profit (TP)</label>
+                <input type="number" step="any" name="takeProfit" value={formData.takeProfit} onChange={handleChange} placeholder="0.0000" className="w-full bg-neutral-900 border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-success/50 text-white font-bold" />
+              </div>
             </div>
           </div>
 
@@ -258,13 +273,15 @@ export default function NewTradePage() {
             <h3 className="font-black text-xs uppercase tracking-[0.3em] border-b border-border pb-4 flex items-center gap-2 text-neutral-400">
               <ImageIcon className="w-4 h-4" /> Market Screenshot
             </h3>
-            <div className="relative group">
+            <div className="relative group mb-6">
               <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
               <div className={cn("aspect-video bg-neutral-950 border border-dashed border-border rounded-lg flex flex-col items-center justify-center text-muted-foreground transition-all group-hover:bg-neutral-900 overflow-hidden", imagePreview && "border-none")}>
                 {imagePreview ? <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" /> : <> <Plus className="w-6 h-6 mb-2 opacity-20" /> <p className="text-[9px] font-black uppercase tracking-widest">Select Image File</p> </>}
               </div>
               {imagePreview && <button type="button" onClick={() => setImagePreview(null)} className="absolute top-2 right-2 p-1 bg-black/60 rounded-full text-white hover:bg-danger z-20 transition-colors"> <X className="w-3 h-3" /> </button>}
             </div>
+
+            <AudioRecorder onAudioSaved={(id) => setAudioId(id)} onDelete={() => setAudioId(null)} />
           </div>
         </div>
       </div>

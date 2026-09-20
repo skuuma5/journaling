@@ -8,6 +8,14 @@ export async function middleware(request: NextRequest) {
     },
   })
 
+  // Check for local session first (Offline mode)
+  const localSession = request.cookies.get('local-session')?.value
+
+  if (localSession) {
+    return response
+  }
+
+  // Check for Supabase session (Online mode)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -17,38 +25,18 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
+          request.cookies.set({ name, value, ...options })
           response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
+            request: { headers: request.headers },
           })
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
+          response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
+          request.cookies.set({ name, value: '', ...options })
           response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
+            request: { headers: request.headers },
           })
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
+          response.cookies.set({ name, value: '', ...options })
         },
       },
     }
@@ -56,8 +44,11 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Protect all routes except auth-related ones
-  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/auth')) {
+  // Redirect to login if no session found and not on auth pages
+  const isAuthPage = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/auth')
+  const isApiAuth = request.nextUrl.pathname.startsWith('/api/auth')
+
+  if (!user && !isAuthPage && !isApiAuth) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

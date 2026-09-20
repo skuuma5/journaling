@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { createClient } from '@/lib/supabase-server'
-import { format } from "date-fns"
+import { format, getHours } from "date-fns"
 
 export async function GET(req: Request) {
   const supabase = createClient()
@@ -15,7 +15,6 @@ export async function GET(req: Request) {
   const accountId = searchParams.get('accountId')
 
   try {
-    // تحديد فلتر البحث: حسابات المستخدم الحالي فقط
     const tradeWhere: any = {
       account: { userId: user.id }
     }
@@ -38,84 +37,78 @@ export async function GET(req: Request) {
       return NextResponse.json({ isEmpty: true })
     }
 
-    // حساب الرصيد الابتدائي (Starting Balance) للمستخدم الحالي فقط
+    // 1. Starting Balance for Equity Curve
     let startingBalance = 0
     if (accountId && accountId !== 'all') {
-      const acc = await prisma.account.findUnique({
-        where: { id: accountId, userId: user.id }
-      })
+      const acc = await prisma.account.findUnique({ where: { id: accountId } })
       startingBalance = acc?.initialBalance || 0
     } else {
-      const userAccounts = await prisma.account.findMany({
-        where: { userId: user.id }
-      })
+      const userAccounts = await prisma.account.findMany({ where: { userId: user.id } })
       startingBalance = userAccounts.reduce((sum, a) => sum + a.initialBalance, 0)
     }
 
-    // 1. منحنى الأسهم (Equity Curve)
+    // 2. Data Aggregators
+    const symbolData: Record<string, number> = {}
+    const sessionData: Record<string, number> = { 'ASIA': 0, 'LONDON': 0, 'NY': 0 }
+    const hourData: Record<number, number> = {}
+    const dayOfWeekData: Record<string, number> = { 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0 }
+    const strategyData: Record<string, number> = {}
+    const mistakeData: Record<string, { count: number, loss: number }> = {}
+
+    // Initialize hours
+    for (let i = 0; i < 24; i++) hourData[i] = 0
+
     let runningBalance = startingBalance
     const equityCurve = trades.map(t => {
-      runningBalance += (t.pnl || 0)
-      return {
-        date: format(new Date(t.date), 'MMM d'),
-        balance: runningBalance
-      }
-    })
+      const pnl = t.pnl || 0
+      runningBalance += pnl
 
-    // 2. الربح والخسارة حسب أيام الأسبوع
-    const pnlByDay: Record<string, number> = {
-      'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0
-    }
-    trades.forEach(t => {
+      // Group by Symbol
+      symbolData[t.symbol] = (symbolData[t.symbol] || 0) + pnl
+
+      // Group by Session
+      if (t.session) sessionData[t.session] = (sessionData[t.session] || 0) + pnl
+
+      // Group by Hour
+      const hour = getHours(new Date(t.date))
+      hourData[hour] += pnl
+
+      // Group by Day
       const day = format(new Date(t.date), 'eee')
-      if (pnlByDay[day] !== undefined) {
-        pnlByDay[day] += (t.pnl || 0)
-      }
-    })
-    const pnlByDayChart = Object.entries(pnlByDay).map(([day, pnl]) => ({ day, pnl }))
+      if (dayOfWeekData[day] !== undefined) dayOfWeekData[day] += pnl
 
-    // 3. نسبة النجاح (Win Rate)
-    const winningTrades = trades.filter(t => (t.pnl || 0) > 0)
-    const winRate = (winningTrades.length / trades.length) * 100
+      // Group by Strategy
+      const sName = t.strategy?.name || 'No Strategy'
+      strategyData[sName] = (strategyData[sName] || 0) + pnl
 
-    // 4. أداء الاستراتيجيات
-    const strategyPerf: Record<string, { name: string, pnl: number }> = {}
-    trades.forEach(t => {
-      const name = t.strategy?.name || 'No Strategy'
-      if (!strategyPerf[name]) strategyPerf[name] = { name, pnl: 0 }
-      strategyPerf[name].pnl += (t.pnl || 0)
-    })
-
-    // 5. تأثير الأخطاء (Mistake Impact)
-    const mistakeImpact: Record<string, { name: string, count: number, loss: number }> = {}
-    trades.forEach(t => {
+      // Group by Mistakes
       t.mistakes.forEach(m => {
-        if (!mistakeImpact[m.name]) mistakeImpact[m.name] = { name: m.name, count: 0, loss: 0 }
-        mistakeImpact[m.name].count++
-        if ((t.pnl || 0) < 0) {
-          mistakeImpact[m.name].loss += (t.pnl || 0)
-        }
+        if (!mistakeData[m.name]) mistakeData[m.name] = { count: 0, loss: 0 }
+        mistakeImpact(mistakeData[m.name], pnl)
       })
+
+      return { date: format(new Date(t.date), 'MMM d'), balance: runningBalance }
     })
 
-    // إحصائيات إضافية (Profit Factor)
-    const sumGains = winningTrades.reduce((sum, t) => sum + (t.pnl || 0), 0)
-    const losingTrades = trades.filter(t => (t.pnl || 0) < 0)
-    const sumLosses = Math.abs(losingTrades.reduce((sum, t) => sum + (t.pnl || 0), 0))
-    const profitFactor = sumLosses > 0 ? sumGains / sumLosses : sumGains > 0 ? 9.99 : 0
+    function mistakeImpact(obj: any, pnl: number) {
+      obj.count++
+      if (pnl < 0) obj.loss += pnl
+    }
 
     return NextResponse.json({
       equityCurve,
-      pnlByDay: pnlByDayChart,
-      winRate,
-      profitFactor,
+      winRate: (trades.filter(t => (t.pnl || 0) > 0).length / trades.length) * 100,
       totalTrades: trades.length,
-      byStrategy: Object.values(strategyPerf).sort((a, b) => b.pnl - a.pnl),
-      byMistake: Object.values(mistakeImpact).sort((a, b) => a.loss - b.loss),
+      pnlByDay: Object.entries(dayOfWeekData).map(([day, pnl]) => ({ day, pnl })),
+      pnlBySymbol: Object.entries(symbolData).map(([name, pnl]) => ({ name, pnl })).sort((a, b) => b.pnl - a.pnl),
+      pnlBySession: Object.entries(sessionData).map(([name, pnl]) => ({ name, pnl })),
+      pnlByHour: Object.entries(hourData).map(([hour, pnl]) => ({ hour: `${hour}:00`, pnl })),
+      byStrategy: Object.entries(strategyData).map(([name, pnl]) => ({ name, pnl })).sort((a, b) => b.pnl - a.pnl),
+      byMistake: Object.entries(mistakeData).map(([name, data]) => ({ name, ...data })).sort((a, b) => a.loss - b.loss),
       isEmpty: false
     })
   } catch (error) {
-    console.error("ANALYTICS_ERROR", error)
-    return NextResponse.json({ error: "Failed to fetch analytics" }, { status: 500 })
+    console.error(error)
+    return NextResponse.json({ error: "Failed to process analytics" }, { status: 500 })
   }
 }

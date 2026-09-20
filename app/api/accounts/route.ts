@@ -11,17 +11,31 @@ export async function GET() {
   }
 
   try {
+    // In dev, try to ensure at least one user exists
+    const existingUser = await prisma.user.findUnique({ where: { id: user.id } })
+    if (!existingUser) {
+      await prisma.user.create({
+        data: {
+          id: user.id,
+          email: user.email || 'dev@local.com',
+          name: 'Trader',
+        }
+      })
+    }
+
     const accounts = await prisma.account.findMany({
       where: { userId: user.id },
       include: {
         _count: {
           select: { trades: true }
         }
-      }
+      },
+      orderBy: { createdAt: 'desc' }
     })
     return NextResponse.json(accounts)
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch accounts" }, { status: 500 })
+  } catch (error: any) {
+    console.error("ACCOUNTS_GET_ERROR", error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
@@ -37,23 +51,49 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { name, initialBalance, currency, profitTarget, maxDrawdown, dailyLossLimit, accountType } = body
 
+    if (!name) {
+      return NextResponse.json({ error: "Account name is required" }, { status: 400 })
+    }
+
+    // Ensure user exists in Prisma
+    const existingUser = await prisma.user.findUnique({ where: { id: user.id } })
+    if (!existingUser) {
+      await prisma.user.create({
+        data: {
+          id: user.id,
+          email: user.email || 'dev@local.com',
+          name: 'Trader',
+        }
+      })
+    }
+
+    // Robust number parsing
+    const parsedBalance = parseFloat(String(initialBalance)) || 0
+    const parsedTarget = profitTarget ? parseFloat(String(profitTarget)) : null
+    const parsedDrawdown = maxDrawdown ? parseFloat(String(maxDrawdown)) : null
+    const parsedDailyLoss = dailyLossLimit ? parseFloat(String(dailyLossLimit)) : null
+
     const account = await prisma.account.create({
       data: {
         name,
-        initialBalance: parseFloat(initialBalance) || 0,
-        currentBalance: parseFloat(initialBalance) || 0,
+        initialBalance: parsedBalance,
+        currentBalance: parsedBalance,
         currency: currency || "USD",
-        profitTarget: profitTarget ? parseFloat(profitTarget) : null,
-        maxDrawdown: maxDrawdown ? parseFloat(maxDrawdown) : null,
-        dailyLossLimit: dailyLossLimit ? parseFloat(dailyLossLimit) : null,
-        accountType,
+        profitTarget: parsedTarget,
+        maxDrawdown: parsedDrawdown,
+        dailyLossLimit: parsedDailyLoss,
+        accountType: accountType || "EVALUATION",
         userId: user.id,
       }
     })
 
     return NextResponse.json(account)
-  } catch (error) {
+  } catch (error: any) {
     console.error("ACCOUNT_CREATE_ERROR", error)
-    return NextResponse.json({ error: "Failed to create account" }, { status: 500 })
+    // Return specific error message for debugging
+    return NextResponse.json({
+      error: error.message || "Database error",
+      details: error.code === 'P2002' ? "Unique constraint failed" : undefined
+    }, { status: 500 })
   }
 }

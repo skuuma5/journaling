@@ -9,27 +9,17 @@ import {
 import { StatCard } from "@/components/StatCard"
 import { BarChart3, TrendingUp, Calendar, Target, Activity, Loader2, Filter } from "lucide-react"
 
-// إجبار الصفحة على أن تكون ديناميكية لتجنب أخطاء Pre-rendering في Vercel
+// إجبار الصفحة على أن تكون ديناميكية
 export const dynamic = 'force-dynamic';
 
 const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b', '#8b5cf6', '#ec4899']
 
 function AnalyticsContent() {
   const searchParams = useSearchParams()
-
-  // استخدام useEffect لتحديث الحالة بدلاً من القيمة الابتدائية المباشرة
-  const [selectedAccountId, setSelectedAccountId] = useState("all")
+  const [selectedAccountId, setSelectedAccountId] = useState(searchParams.get('accountId') || "all")
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [accounts, setAccounts] = useState<any[]>([])
-
-  // تحديث الحساب المختار عند تغير الـ URL
-  useEffect(() => {
-    const accountId = searchParams.get('accountId')
-    if (accountId) {
-      setSelectedAccountId(accountId)
-    }
-  }, [searchParams])
 
   useEffect(() => {
     async function fetchAccounts() {
@@ -188,7 +178,7 @@ function AnalyticsContent() {
                 </ResponsiveContainer>
                 <div className="absolute flex flex-col items-center">
                   <span className="text-3xl font-black text-white">{data.winRate.toFixed(1)}%</span>
-                  <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Edge</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Accuracy</span>
                 </div>
               </div>
             </div>

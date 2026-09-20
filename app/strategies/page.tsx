@@ -2,9 +2,28 @@ import prisma from "@/lib/prisma"
 import { formatCurrency, cn } from "@/lib/utils"
 import { Target, BarChart2, Zap } from "lucide-react"
 import Link from "next/link"
+import { createClient } from '@/lib/supabase-server'
+import { redirect } from 'next/navigation'
+
+interface StrategyWithTrades {
+  id: string;
+  name: string;
+  description: string | null;
+  trades: {
+    pnl: number | null;
+    result: string | null;
+    actualR: number | null;
+  }[];
+}
 
 async function getStrategies() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return null
+
   const strategies = await prisma.strategy.findMany({
+    where: { userId: user.id },
     include: {
       trades: {
         select: {
@@ -16,12 +35,12 @@ async function getStrategies() {
     }
   })
 
-  return strategies.map(s => {
+  return strategies.map((s: any) => {
     const totalTrades = s.trades.length
-    const wins = s.trades.filter(t => (t.pnl || 0) > 0).length
+    const wins = s.trades.filter((t: any) => (t.pnl || 0) > 0).length
     const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0
-    const totalPnl = s.trades.reduce((sum, t) => sum + (t.pnl || 0), 0)
-    const avgR = totalTrades > 0 ? s.trades.reduce((sum, t) => sum + (t.actualR || 0), 0) / totalTrades : 0
+    const totalPnl = s.trades.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0)
+    const avgR = totalTrades > 0 ? s.trades.reduce((sum: number, t: any) => sum + (t.actualR || 0), 0) / totalTrades : 0
 
     return {
       ...s,
@@ -30,11 +49,15 @@ async function getStrategies() {
       totalPnl,
       avgR
     }
-  }).sort((a, b) => b.totalPnl - a.totalPnl)
+  }).sort((a: any, b: any) => b.totalPnl - a.totalPnl)
 }
 
 export default async function StrategiesPage() {
   const strategies = await getStrategies()
+
+  if (strategies === null) {
+    redirect('/login')
+  }
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">

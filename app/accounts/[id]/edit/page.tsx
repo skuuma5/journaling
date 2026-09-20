@@ -216,6 +216,18 @@ export default function EditAccountPage({ params }: { params: { id: string } }) 
                 className="w-full bg-neutral-900 border border-border rounded-md px-4 py-3 text-sm focus:ring-1 focus:ring-white/20 outline-none"
               />
             </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Daily Loss Limit (Daily Drawdown)</label>
+              <input
+                type="number"
+                name="dailyLossLimit"
+                value={formData.dailyLossLimit}
+                onChange={handleChange}
+                className="w-full bg-neutral-900 border border-border rounded-md px-4 py-3 text-sm focus:ring-1 focus:ring-white/20 outline-none"
+                placeholder="e.g. 250"
+              />
+            </div>
           </div>
 
           <div className="pt-6 border-t border-border flex gap-4">

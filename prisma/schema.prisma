@@ -3,14 +3,15 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("POSTGRES_PRISMA_URL") // المتغير الرسمي المولد تلقائياً من فيرسيل
-  directUrl = env("POSTGRES_URL_NON_POOLING") // يستخدم للـ Migrations وتجنب مشاكل الـ Pooling
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
-  id             String         @id
-  email          String         @unique
+  id             String         @id @default(cuid())
+  email          String?        @unique
+  username       String?        @unique
+  password       String?
   name           String?
   accounts       Account[]
   journalEntries JournalEntry[]
@@ -72,6 +73,8 @@ model Trade {
   accountId       String
   account         Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
   images          TradeImage[]
+  audioUrl        String?
+  audioId         String?
   tags            TradeTag[]
   mistakes        Mistake[]    @relation("TradeMistakes")
   createdAt       DateTime     @default(now())
@@ -119,7 +122,7 @@ model TradeTag {
 
 model Mistake {
   id          String   @id @default(cuid())
-  name        String   @unique
+  name        String
   description String?
   userId      String
   user        User     @relation(fields: [userId], references: [id])

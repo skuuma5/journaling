@@ -1,16 +1,40 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { format, subDays, startOfDay } from "date-fns"
+import { createClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const accountId = searchParams.get('accountId')
-
   try {
-    // 1. Get All Accounts for calculations and selector
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const accountId = searchParams.get('accountId')
+
+    // 0. Ensure user exists in Prisma
+    try {
+      await prisma.user.upsert({
+        where: { id: user.id },
+        update: { email: user.email || 'dev@local.com' },
+        create: {
+          id: user.id,
+          email: user.email || 'dev@local.com',
+          name: 'Trader',
+        }
+      })
+    } catch (upsertError) {
+      console.error("USER_SYNC_ERROR:", upsertError)
+    }
+
+    // 1. Get User's Accounts
     const allAccounts = await prisma.account.findMany({
+      where: { userId: user.id },
       include: {
         trades: {
           include: { strategy: true, mistakes: true }
@@ -18,7 +42,7 @@ export async function GET(req: Request) {
       }
     })
 
-    if (allAccounts.length === 0) {
+    if (!allAccounts || allAccounts.length === 0) {
       return NextResponse.json({
         stats: { totalBalance: 0, totalPnl: 0, winRate: 0, profitFactor: 0, todayPnl: 0, totalTrades: 0, maxDrawdown: 0 },
         accounts: [],
@@ -37,13 +61,19 @@ export async function GET(req: Request) {
       ? allAccounts.filter(a => a.id === accountId)
       : allAccounts
 
+    if (selectedAccounts.length === 0 && isFiltered) {
+        // Handle case where filtered account doesn't exist
+        return NextResponse.json({ error: "Selected account not found" }, { status: 404 })
+    }
+
     const trades = selectedAccounts
-      .flatMap(a => a.trades)
-      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .flatMap(a => a.trades || [])
+      .filter(t => t.date)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
     // 3. KPI Calculations
-    const totalBalance = selectedAccounts.reduce((sum, a) => sum + a.currentBalance, 0)
-    const totalInitialBalance = selectedAccounts.reduce((sum, a) => sum + a.initialBalance, 0)
+    const totalBalance = selectedAccounts.reduce((sum, a) => sum + (a.currentBalance || 0), 0)
+    const totalInitialBalance = selectedAccounts.reduce((sum, a) => sum + (a.initialBalance || 0), 0)
     const totalPnl = totalBalance - totalInitialBalance
 
     const winners = trades.filter(t => (t.pnl || 0) > 0)
@@ -55,22 +85,35 @@ export async function GET(req: Request) {
     const profitFactor = sumLosses > 0 ? sumGains / sumLosses : sumGains > 0 ? 9.99 : 0
 
     // Today's P&L
-    const startOfToday = startOfDay(new Date())
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const todayPnl = trades
-      .filter(t => new Date(t.date) >= startOfToday)
+      .filter(t => t.date && new Date(t.date) >= startOfToday)
       .reduce((sum, t) => sum + (t.pnl || 0), 0)
 
     // 4. Equity Curve
-    let eb = totalInitialBalance
+    let eb = isFiltered ? (selectedAccounts[0]?.initialBalance || 0) : totalInitialBalance
     const equityCurve = trades.map(t => {
       eb += (t.pnl || 0)
+      let dateLabel = 'Unknown'
+      try {
+        const d = new Date(t.date)
+        if (!isNaN(d.getTime())) {
+          dateLabel = format(d, 'MMM d')
+        }
+      } catch (e) {}
+
       return {
-        date: format(new Date(t.date), 'MMM d'),
+        date: dateLabel,
         balance: eb
       }
     })
+
     if (equityCurve.length === 0) {
-      equityCurve.push({ date: format(new Date(), 'MMM d'), balance: totalInitialBalance })
+      equityCurve.push({
+        date: format(new Date(), 'MMM d'),
+        balance: isFiltered ? (selectedAccounts[0]?.initialBalance || 0) : totalInitialBalance
+      })
     }
 
     // 5. Peak Performance (Top Strategy)
@@ -85,18 +128,21 @@ export async function GET(req: Request) {
     })
     const topStrategy = Object.values(strategyStats)
       .sort((a, b) => b.pnl - a.pnl)[0] || null
-    if (topStrategy) {
+
+    if (topStrategy && topStrategy.total > 0) {
       (topStrategy as any).winRate = (topStrategy.wins / topStrategy.total) * 100
     }
 
     // 6. Capital Leakage (Top Mistake)
     const mistakeStats: Record<string, { name: string, totalLoss: number, count: number }> = {}
     trades.forEach(t => {
-      t.mistakes.forEach(m => {
-        if (!mistakeStats[m.id]) mistakeStats[m.id] = { name: m.name, totalLoss: 0, count: 0 }
-        mistakeStats[m.id].count++
-        if ((t.pnl || 0) < 0) mistakeStats[m.id].totalLoss += Math.abs(t.pnl || 0)
-      })
+      if (t.mistakes && Array.isArray(t.mistakes)) {
+        t.mistakes.forEach(m => {
+          if (!mistakeStats[m.id]) mistakeStats[m.id] = { name: m.name, totalLoss: 0, count: 0 }
+          mistakeStats[m.id].count++
+          if ((t.pnl || 0) < 0) mistakeStats[m.id].totalLoss += Math.abs(t.pnl || 0)
+        })
+      }
     })
     const topMistake = Object.values(mistakeStats).sort((a, b) => b.totalLoss - a.totalLoss)[0] || null
 
@@ -107,16 +153,23 @@ export async function GET(req: Request) {
       heatmapData[date] = 0
     }
     trades.forEach(t => {
-      const date = format(new Date(t.date), 'yyyy-MM-dd')
-      if (heatmapData[date] !== undefined) {
-        heatmapData[date] += (t.pnl || 0)
-      }
+      try {
+        const d = new Date(t.date)
+        if (!isNaN(d.getTime())) {
+          const dateStr = format(d, 'yyyy-MM-dd')
+          if (heatmapData[dateStr] !== undefined) {
+            heatmapData[dateStr] += (t.pnl || 0)
+          }
+        }
+      } catch (e) {}
     })
 
     // 8. Max Drawdown Calculation
-    let peak = totalInitialBalance
-    let runningBalance = totalInitialBalance
+    let startingEquity = isFiltered ? (selectedAccounts[0]?.initialBalance || 0) : totalInitialBalance
+    let peak = startingEquity
+    let runningBalance = startingEquity
     let maxDD = 0
+
     trades.forEach(t => {
       runningBalance += (t.pnl || 0)
       if (runningBalance > peak) peak = runningBalance
@@ -132,7 +185,7 @@ export async function GET(req: Request) {
         profitFactor,
         todayPnl,
         totalTrades: trades.length,
-        maxDrawdown: -maxDD.toFixed(1)
+        maxDrawdown: parseFloat(maxDD.toFixed(1))
       },
       accounts: allAccounts.map(a => ({
         id: a.id,
@@ -158,8 +211,10 @@ export async function GET(req: Request) {
       heatmapData,
       isEmpty: false
     })
-  } catch (error) {
-    console.error("DASHBOARD_STATS_ERROR", error)
-    return NextResponse.json({ error: "Failed to fetch dashboard stats" }, { status: 500 })
+  } catch (error: any) {
+    console.error("DASHBOARD_STATS_ERROR:", error)
+    return NextResponse.json({
+      error: `Dashboard Error: ${error.message || "Unknown error"}`
+    }, { status: 500 })
   }
 }

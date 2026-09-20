@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   try {
     const trades = await prisma.trade.findMany({
       where: {
-        account: { userId: user.id }, // أمان: جلب صفقات هذا المستخدم فقط
+        account: { userId: user.id },
         AND: [
           accountId && accountId !== 'all' ? { accountId } : {},
           strategyId ? { strategyId } : {},
@@ -52,20 +52,30 @@ export async function POST(req: Request) {
     const {
       accountId, symbol, direction, entryPrice, exitPrice, stopLoss,
       takeProfit, lotSize, date, time, session, strategyId,
-      notes, preTradePlan, postTradeReview, emotion, result,
-      mistakes, tags, pnl, actualR, imageUrl
+      notes, preTradePlan, postTradeReview, emotion, pnl, actualR, imageUrl,
+      audioId, mistakes, tags, result
     } = body
 
     if (!accountId) {
       return NextResponse.json({ error: "Account ID is required" }, { status: 400 })
     }
 
-    // التأكد من أن الحساب يخص المستخدم الحالي
+    // Ensure user exists in Prisma (for mock/local dev)
+    await prisma.user.upsert({
+      where: { id: user.id },
+      update: {},
+      create: {
+        id: user.id,
+        email: user.email || 'dev@local.com',
+        name: 'Trader',
+      }
+    })
+
     const account = await prisma.account.findUnique({
       where: { id: accountId, userId: user.id }
     })
 
-    if (!account) return NextResponse.json({ error: "Account not found or access denied" }, { status: 404 })
+    if (!account) return NextResponse.json({ error: "Account not found" }, { status: 404 })
 
     const metrics = calculateTradeMetrics({
       entry: parseFloat(entryPrice) || 0,
@@ -77,12 +87,14 @@ export async function POST(req: Request) {
       accountBalance: account.currentBalance
     })
 
-    const finalPnl = pnl !== null && pnl !== undefined && pnl !== "" ? parseFloat(pnl) : metrics.pnl
-    const finalActualR = actualR !== null && actualR !== undefined && actualR !== "" ? parseFloat(actualR) : metrics.actualR
+    const finalPnl = (pnl !== null && pnl !== undefined) ? parseFloat(pnl) : metrics.pnl
+    const finalActualR = (actualR !== null && actualR !== undefined) ? parseFloat(actualR) : metrics.actualR
 
-    let finalResult = "BREAKEVEN"
-    if (finalPnl > 0) finalResult = "WIN"
-    else if (finalPnl < 0) finalResult = "LOSS"
+    let finalResult = result || "BREAKEVEN"
+    if (!result) {
+      if (finalPnl > 0) finalResult = "WIN"
+      else if (finalPnl < 0) finalResult = "LOSS"
+    }
 
     const tradeDate = new Date(`${date}T${time}`)
 
@@ -111,14 +123,13 @@ export async function POST(req: Request) {
           riskPercent: metrics.riskPercent,
           rewardToRisk: metrics.rewardToRisk,
           status: "CLOSED",
-          // ربط الأخطاء بالمستخدم الحالي
+          audioId,
           mistakes: {
             connectOrCreate: (mistakes || []).map((m: string) => ({
               where: { name_userId: { name: m, userId: user.id } },
               create: { name: m, userId: user.id }
             }))
           },
-          // ربط التاغات بالمستخدم الحالي
           tags: {
             create: (tags || []).map((t: string) => ({
               tag: {
@@ -130,21 +141,14 @@ export async function POST(req: Request) {
             }))
           },
           images: imageUrl ? {
-            create: {
-              url: imageUrl,
-              type: "AFTER"
-            }
+            create: { url: imageUrl, type: "AFTER" }
           } : undefined
         }
       })
 
       await tx.account.update({
         where: { id: accountId },
-        data: {
-          currentBalance: {
-            increment: finalPnl
-          }
-        }
+        data: { currentBalance: { increment: finalPnl } }
       })
 
       await tx.accountSnapshot.create({

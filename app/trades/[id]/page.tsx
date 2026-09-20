@@ -20,16 +20,23 @@ import {
   Layers,
   ImageIcon,
   X,
-  Loader2
+  Loader2,
+  Play,
+  Pause,
+  Volume2
 } from "lucide-react"
 import Link from "next/link"
 import { notFound, useRouter } from "next/navigation"
+import { getAudio } from "@/lib/audio-storage"
 
 export default function TradeDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [trade, setTrade] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isZoomed, setIsZoomed] = useState(false)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     async function fetchTrade() {
@@ -38,6 +45,13 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
         if (res.status === 404) return notFound()
         const data = await res.json()
         setTrade(data)
+
+        if (data.audioId) {
+          const blob = await getAudio(data.audioId)
+          if (blob) {
+            setAudioUrl(URL.createObjectURL(blob))
+          }
+        }
       } catch (e) {
         console.error("Fetch error:", e)
       } finally {
@@ -46,6 +60,17 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
     }
     fetchTrade()
   }, [params.id])
+
+  const togglePlay = () => {
+    if (audioRef) {
+      if (isPlaying) {
+        audioRef.pause()
+      } else {
+        audioRef.play()
+      }
+      setIsPlaying(!isPlaying)
+    }
+  }
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
@@ -60,7 +85,6 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
   const isWin = pnlValue > 0
   const isLoss = pnlValue < 0
 
-  // Robust check for images array to fix "undefined reading find"
   const images = trade.images || []
   const mainImage = images.length > 0
     ? (images.find((img: any) => img.type === "AFTER") || images[0])
@@ -180,13 +204,44 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
               </div>
             </div>
           </div>
+
+          {audioUrl && (
+            <div className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-2xl">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 flex items-center gap-2">
+                <Volume2 className="w-3.5 h-3.5" /> Audio Journal
+              </h3>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={togglePlay}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-black hover:bg-neutral-200 transition-all"
+                >
+                  {isPlaying ? <Pause className="w-4 h-4 fill-black" /> : <Play className="w-4 h-4 fill-black ml-0.5" />}
+                </button>
+                <div className="flex-1">
+                  <div className="h-1 bg-neutral-800 rounded-full overflow-hidden">
+                    <div
+                      className={cn("h-full transition-all duration-300", isWin ? "bg-success" : isLoss ? "bg-danger" : "bg-white")}
+                      style={{ width: isPlaying ? '100%' : '0%', transition: isPlaying ? 'width 10s linear' : 'none' }}
+                    />
+                  </div>
+                  <div className="text-[8px] font-black uppercase text-neutral-500 mt-2 tracking-widest">Voice Memo Captured</div>
+                </div>
+              </div>
+              <audio
+                ref={(el) => setAudioRef(el)}
+                src={audioUrl}
+                onEnded={() => setIsPlaying(false)}
+                className="hidden"
+              />
+            </div>
+          )}
         </div>
 
         {/* CENTER: Main Chart Display */}
         <div className="col-span-12 lg:col-span-6 space-y-6">
           <div className={cn(
-            "bg-card border rounded-xl overflow-hidden shadow-2xl relative group transition-all duration-300 border-t-4",
-            isWin ? "border-success shadow-success/5" : isLoss ? "border-danger shadow-danger/5" : "border-border"
+            "bg-card border rounded-xl overflow-hidden shadow-2xl relative group transition-all duration-300",
+            isWin ? "border-success/20 shadow-success/5" : isLoss ? "border-danger/20 shadow-danger/5" : "border-border"
           )}>
             <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
@@ -222,9 +277,9 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-2xl">
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-success flex items-center gap-2">
-                <BrainCircuit className="w-3.5 h-3.5" /> Logic / Plan
+                <BrainCircuit className="w-3.5 h-3.5" /> Entry Logic
               </h3>
-              <p className="text-[11px] font-medium text-neutral-300 leading-relaxed italic min-h-[100px]">
+              <p className="text-[11px] font-medium text-neutral-300 leading-relaxed min-h-[100px] italic">
                 {trade.preTradePlan || "Zero log records for this execution model."}
               </p>
             </div>
@@ -232,7 +287,7 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500 flex items-center gap-2">
                 <Activity className="w-3.5 h-3.5" /> Post-Execution Reality
               </h3>
-              <p className="text-[11px] font-medium text-neutral-300 leading-relaxed italic min-h-[100px]">
+              <p className="text-[11px] font-medium text-neutral-300 leading-relaxed min-h-[100px] italic">
                 {trade.postTradeReview || "Zero log records for post-execution reality."}
               </p>
             </div>
@@ -275,6 +330,14 @@ export default function TradeDetailPage({ params }: { params: { id: string } }) 
                     <span className={cn("text-xs font-black tabular-nums", isWin ? "text-success" : isLoss ? "text-danger" : "text-neutral-400")}>
                       {pnlValue >= 0 ? "+" : ""}{trade.account?.initialBalance ? ((pnlValue / trade.account.initialBalance) * 100).toFixed(2) : "0.00"}%
                     </span>
+                  </div>
+                </div>
+                <div className="pt-6 border-t border-border space-y-4">
+                  <h4 className="text-[9px] font-black text-neutral-500 uppercase tracking-[0.3em]">Behavioral Audit</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {trade.mistakes?.length > 0 ? trade.mistakes.map((m: any) => (
+                      <span key={m.id} className="inline-flex items-center px-2 py-1 bg-danger/10 text-danger border border-danger/20 rounded text-[9px] font-black uppercase tracking-widest">{m.name}</span>
+                    )) : <div className="flex items-center gap-2 text-success/80"><Shield className="w-3.5 h-3.5" /><span className="text-[9px] font-black uppercase tracking-widest">Execution Protocol Met</span></div>}
                   </div>
                 </div>
              </div>
