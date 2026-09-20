@@ -1,12 +1,12 @@
-import nextDynamic from 'next/dynamic'
+import dynamicImport from 'next/dynamic'
 import { Suspense } from "react"
 import { Loader2 } from "lucide-react"
 
-// Force l-page t-khdem dima dynamic
+// Hada segment config dyal Next.js (khass ykoun smiyto 'dynamic')
 export const dynamic = 'force-dynamic';
 
-// Import l-Client Component m3a ssr: false (kat-7iyd l-mouchkil dyal useSearchParams f-l-build)
-const AnalyticsClient = nextDynamic(() => import('./AnalyticsClient'), {
+// Hada dynamic import dyal l-component (renamed to dynamicImport bach may-kounch conflict)
+const AnalyticsClient = dynamicImport(() => import('./AnalyticsClient'), {
   ssr: false,
   loading: () => (
     <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
