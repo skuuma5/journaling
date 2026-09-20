@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Mic, Square, Play, Trash2, Pause, Loader2, CloudUpload } from "lucide-react"
+import { Mic, Square, Play, Trash2, Pause, Loader2, Cloud, UploadCloud } from "lucide-react"
 import { saveAudio, getAudio, deleteAudio } from "@/lib/audio-storage"
 import { createClient } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
@@ -14,6 +14,7 @@ interface AudioRecorderProps {
 }
 
 export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAudioUrl, onDelete }: AudioRecorderProps) {
+  const [mounted, setMounted] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(initialAudioUrl || null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -22,22 +23,28 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
   const mediaRecorder = useRef<MediaRecorder | null>(null)
   const audioChunks = useRef<Blob[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const supabase = createClient()
 
   useEffect(() => {
+    setMounted(true)
     if (initialAudioId && !initialAudioUrl) {
       loadLocalAudio(initialAudioId)
     }
   }, [initialAudioId, initialAudioUrl])
 
   async function loadLocalAudio(id: string) {
-    const blob = await getAudio(id)
-    if (blob) {
-      setAudioUrl(URL.createObjectURL(blob))
+    try {
+      const blob = await getAudio(id)
+      if (blob) {
+        setAudioUrl(URL.createObjectURL(blob))
+      }
+    } catch (e) {
+      console.error("Local audio load failed", e)
     }
   }
 
   const startRecording = async () => {
+    if (typeof window === "undefined" || !navigator.mediaDevices) return
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       mediaRecorder.current = new MediaRecorder(stream)
@@ -51,13 +58,12 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
         const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' })
         const localId = `audio-${Date.now()}`
 
-        // 1. Save locally for offline use
         await saveAudio(localId, audioBlob)
         setAudioId(localId)
 
-        // 2. Upload to Supabase for Cloud Sync
         setIsUploading(true)
         try {
+          const supabase = createClient()
           const fileName = `${localId}.webm`
           const { data, error } = await supabase.storage
             .from('trade-audios')
@@ -72,9 +78,9 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
           setAudioUrl(publicUrl)
           onAudioSaved(localId, publicUrl)
         } catch (err) {
-          console.error("Cloud upload failed:", err)
+          console.error("Cloud sync failed", err)
           setAudioUrl(URL.createObjectURL(audioBlob))
-          onAudioSaved(localId) // Still works locally
+          onAudioSaved(localId)
         } finally {
           setIsUploading(false)
         }
@@ -83,7 +89,7 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
       mediaRecorder.current.start()
       setIsRecording(true)
     } catch (err) {
-      console.error("Error accessing microphone:", err)
+      alert("Microphone access denied.")
     }
   }
 
@@ -100,7 +106,7 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
       if (isPlaying) {
         audioRef.current.pause()
       } else {
-        audioRef.current.play()
+        audioRef.current.play().catch(() => setIsPlaying(false))
       }
       setIsPlaying(!isPlaying)
     }
@@ -113,14 +119,16 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
     if (onDelete) onDelete()
   }
 
+  if (!mounted) return <div className="h-24 bg-neutral-900 border border-border rounded-lg animate-pulse" />
+
   return (
     <div className="flex flex-col gap-3 p-4 bg-neutral-900 border border-border rounded-lg">
       <div className="flex items-center justify-between">
         <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-          Audio Journal {isUploading && <Loader2 className="w-3 h-3 animate-spin" />}
+          Audio Journal {isUploading && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
         </label>
         {audioUrl && (
-          <button onClick={handleDelete} className="text-danger hover:text-danger/80 transition-colors">
+          <button type="button" onClick={handleDelete} className="text-danger hover:text-danger/80 transition-colors">
             <Trash2 className="w-4 h-4" />
           </button>
         )}
@@ -155,10 +163,10 @@ export default function AudioRecorder({ onAudioSaved, initialAudioId, initialAud
             <div className="text-[10px] font-black uppercase text-primary animate-pulse tracking-widest">Syncing to Cloud...</div>
           ) : audioUrl ? (
             <div className="text-[10px] font-black uppercase text-success tracking-widest flex items-center gap-2">
-              <CloudUpload className="w-3 h-3" /> Memo Secured Online
+              <UploadCloud className="w-3.5 h-3.5" /> Memo Secured
             </div>
           ) : (
-            <div className="text-[10px] font-black uppercase text-neutral-500 tracking-widest">No audio recorded</div>
+            <div className="text-[10px] font-black uppercase text-neutral-500 tracking-widest italic">No audio recorded</div>
           )}
         </div>
       </div>
